@@ -16,6 +16,7 @@ local.properties
 
 # Large binary assets — provisioned by ./download_assets.sh (run before building).
 # Kept out of git to keep the repo and its history slim. Runtime stays 100% offline.
+# tokens_*.txt / lexicon.txt are tiny text files and stay tracked.
 /app/libs/sherpa-onnx.aar
-/app/src/main/assets/tts/persian_model.onnx
+/app/src/main/assets/tts/model_*.onnx
 /app/src/main/assets/tts/espeak-ng-data/

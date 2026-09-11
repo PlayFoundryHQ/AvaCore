@@ -18,49 +18,59 @@ import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
+/** One bundled Piper voice. Persian gets the full NLP front-end (ezafe,
+ *  number expansion, script normalisation) because eSpeak-NG's own Persian
+ *  support is weak; other languages' eSpeak front ends already handle
+ *  numbers/punctuation, so they go straight to segmentation. */
+private data class VoiceModel(
+    val lang: String,
+    val locale: Locale,
+    val voiceName: String,
+    val modelAsset: String,
+    val tokensAsset: String,
+    val usePersianPipeline: Boolean,
+)
+
 /**
- * AvaTtsService: an offline-first, streaming Persian TTS engine.
+ * AvaTtsService: an offline-first, streaming, **multi-language** TTS engine —
+ * Persian (its heart), English and Swedish today.
  *
  * Synthesis is streamed sentence-by-sentence via Sherpa's generateWithCallback,
  * so the first audio plays almost immediately and stop requests are honored
- * mid-utterance. A Persian text front-end ([TextProcessor]) normalizes text,
- * expands numbers, applies a pronunciation lexicon and segments into prosodic
- * units before the audio model ever runs.
+ * mid-utterance. Each language gets its own lazily-initialized [OfflineTts]
+ * engine + [TextProcessor], so binding the service doesn't pay for models the
+ * caller never asks for.
  */
 class AvaTtsService : TextToSpeechService() {
 
-    private val persianLocale = Locale("fa", "IR")
-    private val voiceName = "fa-ir-ava-premium"
-
-    @Volatile
-    private var tts: OfflineTts? = null
-    @Volatile
-    private var textProcessor: TextProcessor? = null
-
-    // Counts down once initialization finishes (success or failure).
-    private val initLatch = CountDownLatch(1)
+    // Engines + processors are keyed by language code and built lazily, one
+    // background thread per language, the first time that language is asked
+    // for — binding the service never pays for a model nobody requested.
+    private val engines = ConcurrentHashMap<String, OfflineTts>()
+    private val processors = ConcurrentHashMap<String, TextProcessor>()
+    private val initLatches = ConcurrentHashMap<String, CountDownLatch>()
+    private val initializing = ConcurrentHashMap<String, AtomicBoolean>()
 
     private val isInterrupted = AtomicBoolean(false)
-    private val isInitializing = AtomicBoolean(false)
     private val isDestroyed = AtomicBoolean(false)
 
     companion object {
         private const val TAG = "AvaTtsService"
         private const val ASSET_SUBDIR = "tts"
-        private const val MODEL_NAME = "persian_model.onnx"
-        private const val TOKENS_NAME = "tokens.txt"
         private const val LEXICON_NAME = "lexicon.txt"
         private const val ESPEAK_DIR = "espeak-ng-data"
         private const val VERSION_MARKER = ".assets_version"
 
         // Bump whenever the bundled model/tokens/espeak/lexicon assets change so
         // stale copies in filesDir are re-extracted on the next launch.
-        private const val ASSETS_VERSION = 2
+        // v3: multi-language — Persian, English, Swedish.
+        private const val ASSETS_VERSION = 3
 
         // Keep chunks small; some OEM audio paths reject large buffers.
         private const val MAX_CHUNK_BYTES = 8192
@@ -70,37 +80,78 @@ class AvaTtsService : TextToSpeechService() {
         // engine speed multiplier, clamped to a sane musical range.
         private const val MIN_SPEED = 0.5f
         private const val MAX_SPEED = 2.0f
+
+        // Persian is listed first: it's AvaCore's primary language and the
+        // default reported by onGetLanguage(). Run `download_assets.sh` to
+        // provision the bundled model/tokens files for all three.
+        private val VOICES = listOf(
+            VoiceModel(
+                lang = "fa", locale = Locale("fa", "IR"), voiceName = "fa-ir-ava-premium",
+                modelAsset = "model_fa.onnx", tokensAsset = "tokens_fa.txt", usePersianPipeline = true,
+            ),
+            VoiceModel(
+                lang = "en", locale = Locale.US, voiceName = "en-us-ava-premium",
+                modelAsset = "model_en.onnx", tokensAsset = "tokens_en.txt", usePersianPipeline = false,
+            ),
+            VoiceModel(
+                lang = "sv", locale = Locale("sv", "SE"), voiceName = "sv-se-ava-premium",
+                modelAsset = "model_sv.onnx", tokensAsset = "tokens_sv.txt", usePersianPipeline = false,
+            ),
+        )
+
+        /** Some framework call sites pass a 2-letter code ("en"), others the
+         *  ISO-3 form ("eng") — match either against both [VoiceModel.lang]
+         *  and the locale's own ISO-3 language. */
+        private fun voiceForLang(lang: String?): VoiceModel? {
+            if (lang.isNullOrBlank()) return null
+            return VOICES.firstOrNull {
+                it.lang.equals(lang, ignoreCase = true) ||
+                    runCatching { it.locale.isO3Language }.getOrNull()?.equals(lang, ignoreCase = true) == true
+            }
+        }
+
+        private fun voiceForName(name: String?): VoiceModel? =
+            VOICES.firstOrNull { it.voiceName == name }
     }
 
     override fun onCreate() {
         Log.d(TAG, "onCreate: Initializing AvaCore TTS")
         super.onCreate()
-        ensureEngineInitialized()
+        // Warm Persian eagerly — it's the primary/default language and the
+        // most likely first request; English/Swedish stay lazy.
+        ensureEngineInitialized(VOICES.first())
     }
 
-    private fun ensureEngineInitialized() {
-        if (isDestroyed.get() || tts != null) return
-        if (!isInitializing.compareAndSet(false, true)) return
+    private fun ensureEngineInitialized(voice: VoiceModel) {
+        if (isDestroyed.get() || engines.containsKey(voice.lang)) return
+        val latch = initLatches.computeIfAbsent(voice.lang) { CountDownLatch(1) }
+        val flag = initializing.computeIfAbsent(voice.lang) { AtomicBoolean(false) }
+        if (!flag.compareAndSet(false, true)) return
 
-        thread(start = true, name = "TtsInitializer") {
+        thread(start = true, name = "TtsInitializer-${voice.lang}") {
             try {
-                prepareAndInitialize()
+                prepareAndInitialize(voice)
             } catch (e: Throwable) {
-                Log.e(TAG, "CRITICAL: TTS init failed", e)
+                Log.e(TAG, "CRITICAL: TTS init failed for ${voice.lang}", e)
             } finally {
-                isInitializing.set(false)
-                initLatch.countDown()
+                flag.set(false)
+                latch.countDown()
             }
         }
     }
 
-    private fun prepareAndInitialize() {
+    private fun prepareAndInitialize(voice: VoiceModel) {
         ensureAssets()
         if (isDestroyed.get()) return
 
-        val modelFile = File(filesDir, MODEL_NAME)
-        val tokensFile = File(filesDir, TOKENS_NAME)
+        val modelFile = File(filesDir, voice.modelAsset)
+        val tokensFile = File(filesDir, voice.tokensAsset)
         val espeakDir = File(filesDir, ESPEAK_DIR)
+
+        if (!modelFile.exists() || tokensFile.length() == 0L) {
+            Log.w(TAG, "No bundled model for '${voice.lang}' — run download_assets.sh; that voice stays unavailable")
+            return
+        }
 
         val vitsConfig = OfflineTtsVitsModelConfig(
             model = modelFile.absolutePath,
@@ -114,7 +165,7 @@ class AvaTtsService : TextToSpeechService() {
 
         val cpuThreads = (Runtime.getRuntime().availableProcessors() / 2)
             .coerceIn(1, 4)
-        Log.d(TAG, "Initializing engine with $cpuThreads threads")
+        Log.d(TAG, "Initializing '${voice.lang}' engine with $cpuThreads threads")
 
         val modelConfig = OfflineTtsModelConfig(
             vits = vitsConfig,
@@ -125,20 +176,28 @@ class AvaTtsService : TextToSpeechService() {
 
         val newTts = OfflineTts(config = OfflineTtsConfig(model = modelConfig))
 
-        // Build the Persian text front-end (lexicon is optional / best-effort).
-        val lexicon = try {
-            PronunciationLexicon.fromStream(File(filesDir, LEXICON_NAME).takeIf { it.exists() }?.inputStream())
-        } catch (e: Exception) {
-            Log.w(TAG, "Lexicon load failed; continuing without it", e)
-            PronunciationLexicon.fromStream(null)
+        val processor = if (voice.usePersianPipeline) {
+            // The Persian text front-end (lexicon is optional / best-effort).
+            val lexicon = try {
+                PronunciationLexicon.fromStream(File(filesDir, LEXICON_NAME).takeIf { it.exists() }?.inputStream())
+            } catch (e: Exception) {
+                Log.w(TAG, "Lexicon load failed; continuing without it", e)
+                PronunciationLexicon.fromStream(null)
+            }
+            TextProcessor(lexicon, applyPersianPipeline = true).also {
+                Log.i(TAG, "AvaCore ready for 'fa'. SR=${newTts.sampleRate()} lexicon=${lexicon.size}")
+            }
+        } else {
+            TextProcessor(PronunciationLexicon.fromStream(null), applyPersianPipeline = false).also {
+                Log.i(TAG, "AvaCore ready for '${voice.lang}'. SR=${newTts.sampleRate()}")
+            }
         }
-        textProcessor = TextProcessor(lexicon)
 
         if (isDestroyed.get()) {
             newTts.release()
         } else {
-            tts = newTts
-            Log.i(TAG, "AvaCore ready. SR=${newTts.sampleRate()} lexicon=${lexicon.size}")
+            engines[voice.lang] = newTts
+            processors[voice.lang] = processor
         }
     }
 
@@ -149,24 +208,30 @@ class AvaTtsService : TextToSpeechService() {
     private fun ensureAssets() {
         val marker = File(filesDir, VERSION_MARKER)
         val current = marker.takeIf { it.exists() }?.readText()?.trim()?.toIntOrNull()
-        if (current == ASSETS_VERSION &&
-            File(filesDir, MODEL_NAME).length() > 0L &&
-            File(filesDir, TOKENS_NAME).exists() &&
-            File(filesDir, ESPEAK_DIR).isDirectory
-        ) {
+        if (current == ASSETS_VERSION && File(filesDir, ESPEAK_DIR).isDirectory) {
             return // up to date
         }
 
         Log.i(TAG, "Extracting assets (have=$current want=$ASSETS_VERSION)")
         marker.delete() // invalidate until the full copy succeeds
 
-        copyAssetAtomic(MODEL_NAME)
-        copyAssetAtomic(TOKENS_NAME)
-        copyAssetAtomic(LEXICON_NAME)
+        for (voice in VOICES) {
+            copyAssetIfBundled(voice.modelAsset)
+            copyAssetIfBundled(voice.tokensAsset)
+        }
+        copyAssetIfBundled(LEXICON_NAME)
         File(filesDir, ESPEAK_DIR).deleteRecursively()
         copyAssetDir("$ASSET_SUBDIR/$ESPEAK_DIR", File(filesDir, ESPEAK_DIR))
 
         marker.writeText(ASSETS_VERSION.toString())
+    }
+
+    /** Some languages' model/tokens files may not be bundled yet (partial
+     *  `download_assets.sh` run) — skip them rather than fail the whole batch;
+     *  [prepareAndInitialize] treats a missing model as "voice unavailable". */
+    private fun copyAssetIfBundled(fileName: String) {
+        val present = runCatching { assets.open("$ASSET_SUBDIR/$fileName").use { } }.isSuccess
+        if (present) copyAssetAtomic(fileName) else Log.w(TAG, "asset not bundled, skipping: $fileName")
     }
 
     /** Copy a single asset via a temp file + rename so a crash never leaves a
@@ -204,24 +269,28 @@ class AvaTtsService : TextToSpeechService() {
     // ------------------------------------------------------------------
 
     override fun onIsLanguageAvailable(lang: String?, country: String?, variant: String?): Int {
-        return if (lang != null && (lang.equals("fa", true) || lang.equals("fas", true))) {
+        val voice = voiceForLang(lang) ?: return TextToSpeech.LANG_NOT_SUPPORTED
+        return if (country.isNullOrEmpty() || voice.locale.country.equals(country, ignoreCase = true)) {
             TextToSpeech.LANG_COUNTRY_AVAILABLE
         } else {
-            TextToSpeech.LANG_NOT_SUPPORTED
+            TextToSpeech.LANG_AVAILABLE
         }
     }
 
-    override fun onGetLanguage(): Array<String> = arrayOf("fa", "IR", "")
+    override fun onGetLanguage(): Array<String> {
+        val v = VOICES.first()
+        return arrayOf(v.lang, v.locale.country, "")
+    }
 
     override fun onLoadLanguage(lang: String?, country: String?, variant: String?): Int =
         onIsLanguageAvailable(lang, country, variant)
 
-    override fun onGetVoices(): MutableList<Voice> = mutableListOf(
-        Voice(voiceName, persianLocale, Voice.QUALITY_VERY_HIGH, Voice.LATENCY_NORMAL, false, mutableSetOf())
-    )
+    override fun onGetVoices(): MutableList<Voice> =
+        VOICES.map { Voice(it.voiceName, it.locale, Voice.QUALITY_VERY_HIGH, Voice.LATENCY_NORMAL, false, mutableSetOf()) }
+            .toMutableList()
 
     override fun onGetDefaultVoiceNameFor(lang: String?, country: String?, variant: String?): String? =
-        if (onIsLanguageAvailable(lang, country, variant) >= TextToSpeech.LANG_AVAILABLE) voiceName else null
+        voiceForLang(lang)?.voiceName?.takeIf { onIsLanguageAvailable(lang, country, variant) >= TextToSpeech.LANG_AVAILABLE }
 
     override fun onStop() {
         Log.d(TAG, "onStop: interrupting synthesis")
@@ -238,12 +307,13 @@ class AvaTtsService : TextToSpeechService() {
 
         isInterrupted.set(false)
 
-        val engine = awaitEngine()
-        val processor = textProcessor
+        val voice = voiceForName(request.voiceName) ?: voiceForLang(request.language) ?: VOICES.first()
+        val engine = awaitEngine(voice)
+        val processor = processors[voice.lang]
         if (engine == null || processor == null) {
-            Log.e(TAG, "Engine not ready in time")
+            Log.e(TAG, "Engine not ready in time for '${voice.lang}'")
             callback.error(TextToSpeech.ERROR_SERVICE)
-            ensureEngineInitialized()
+            ensureEngineInitialized(voice)
             return
         }
 
@@ -254,7 +324,7 @@ class AvaTtsService : TextToSpeechService() {
         // untouched audio at full speed.
         val pitchFactor = (request.pitch / 100f).coerceIn(0.5f, 2.0f)
         val applyPitch = abs(pitchFactor - 1f) >= 0.01f
-        Log.d(TAG, "synthesize: rate=${request.speechRate} pitch=${request.pitch} " +
+        Log.d(TAG, "synthesize[${voice.lang}]: rate=${request.speechRate} pitch=${request.pitch} " +
             "len=${rawText.length} text='${rawText.take(60).replace('\n', ' ')}'")
 
         try {
@@ -298,15 +368,15 @@ class AvaTtsService : TextToSpeechService() {
         }
     }
 
-    private fun awaitEngine(): OfflineTts? {
-        tts?.let { return it }
-        ensureEngineInitialized()
+    private fun awaitEngine(voice: VoiceModel): OfflineTts? {
+        engines[voice.lang]?.let { return it }
+        ensureEngineInitialized(voice)
         try {
-            initLatch.await(INIT_WAIT_MS, TimeUnit.MILLISECONDS)
+            initLatches[voice.lang]?.await(INIT_WAIT_MS, TimeUnit.MILLISECONDS)
         } catch (e: InterruptedException) {
             Thread.currentThread().interrupt()
         }
-        return tts
+        return engines[voice.lang]
     }
 
     private fun computeSpeed(request: SynthesisRequest): Float {
@@ -316,11 +386,11 @@ class AvaTtsService : TextToSpeechService() {
     }
 
     override fun onDestroy() {
-        Log.d(TAG, "onDestroy: releasing engine")
+        Log.d(TAG, "onDestroy: releasing engines")
         isDestroyed.set(true)
         isInterrupted.set(true)
-        tts?.release()
-        tts = null
+        engines.values.forEach { it.release() }
+        engines.clear()
         super.onDestroy()
     }
 
