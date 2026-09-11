@@ -292,6 +292,17 @@ class AvaTtsService : TextToSpeechService() {
     override fun onGetDefaultVoiceNameFor(lang: String?, country: String?, variant: String?): String? =
         voiceForLang(lang)?.voiceName?.takeIf { onIsLanguageAvailable(lang, country, variant) >= TextToSpeech.LANG_AVAILABLE }
 
+    // TextToSpeech.setVoice() calls these per-voice hooks (not the legacy
+    // locale-based ones above) to validate/load a voice by name. Without them
+    // the framework's default implementation rejects every voice, so
+    // setVoice() silently fails and the client's previously-active voice
+    // stays in effect — the bug that made every language sound like whichever
+    // voice happened to load first.
+    override fun onIsValidVoiceName(voiceName: String?): Int =
+        if (voiceForName(voiceName) != null) TextToSpeech.SUCCESS else TextToSpeech.ERROR
+
+    override fun onLoadVoice(voiceName: String?): Int = onIsValidVoiceName(voiceName)
+
     override fun onStop() {
         Log.d(TAG, "onStop: interrupting synthesis")
         isInterrupted.set(true)
