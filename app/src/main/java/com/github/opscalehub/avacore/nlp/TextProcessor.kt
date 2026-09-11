@@ -7,10 +7,14 @@ package com.github.opscalehub.avacore.nlp
 data class SpeakUnit(val text: String, val trailingPauseMs: Int)
 
 /**
- * The Persian text front-end: turns raw input (plain or SSML) into an ordered
- * list of [SpeakUnit]s ready for the neural engine.
+ * Turns raw input (plain or SSML) into an ordered list of [SpeakUnit]s ready
+ * for the neural engine. SSML parsing and sentence segmentation are language-
+ * generic; the digit/number expansion, script normalisation and pronunciation
+ * lexicon are Persian-specific — eSpeak-NG's own English/Swedish/etc. front
+ * ends already handle numbers and punctuation for those languages, so
+ * [applyPersianPipeline] `= false` skips straight to segmentation for them.
  *
- * Pipeline order matters:
+ * Pipeline order matters (Persian only):
  *   1. SSML parse           — split into content segments + forced pauses
  *   2. NumberToWords.expand — BEFORE punctuation folding, so "1,000"/"۱٬۰۰۰"
  *                             thousands separators are still intact
@@ -21,7 +25,8 @@ data class SpeakUnit(val text: String, val trailingPauseMs: Int)
  */
 class TextProcessor(
     private val lexicon: PronunciationLexicon,
-    private val normalizer: Normalizer = Normalizer()
+    private val normalizer: Normalizer = Normalizer(),
+    private val applyPersianPipeline: Boolean = true,
 ) {
 
     fun process(raw: String): List<SpeakUnit> {
@@ -52,6 +57,7 @@ class TextProcessor(
     }
 
     private fun pipeline(text: String): String {
+        if (!applyPersianPipeline) return text.replace(Regex("\\s+"), " ").trim()
         var s = NumberToWords.expand(text)
         s = normalizer.normalize(s)
         s = NumberToWords.foldDigits(s)        // fold any digits left after expansion

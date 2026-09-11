@@ -1,18 +1,20 @@
-# AvaCore: Native Persian Text-to-Speech (TTS) Engine for Android
+# AvaCore: Native Multi-Language Text-to-Speech (TTS) Engine for Android
 
-AvaCore is a high-performance, on-device Persian (Farsi) Text-to-Speech engine designed to provide a natural and seamless voice experience for Android users. By integrating directly with the `android.speech.tts` framework, AvaCore enables all Android applications to speak Farsi with human-like prosody and high clarity. On the device it runs **entirely offline** — no network access is needed at run time.
+AvaCore is a high-performance, on-device Text-to-Speech engine designed to provide a natural and seamless voice experience for Android users. By integrating directly with the `android.speech.tts` framework, AvaCore enables all Android applications to speak with human-like prosody and high clarity. On the device it runs **entirely offline** — no network access is needed at run time.
+
+**Persian (Farsi) is the heart of the project** — the language AvaCore was built to get right, with a real linguistic front-end (see Project Vision below). **English and Swedish** are bundled alongside it as first-class Piper voices, so any app that lets the user pick AvaCore gets consistently better speech than the stock system engine across all three, not just Persian.
 
 ## Project Vision
-To bridge the accessibility gap for Persian speakers on Android by delivering a state-of-the-art TTS engine that overcomes the unique linguistic challenges of the Farsi language, such as short-vowel omission and hidden *Ezafe* (کسرهٔ اضافه) constructions.
+To bridge the accessibility gap for Persian speakers on Android by delivering a state-of-the-art TTS engine that overcomes the unique linguistic challenges of the Farsi language, such as short-vowel omission and hidden *Ezafe* (کسرهٔ اضافه) constructions — and, from there, to be a genuinely good general-purpose offline voice for the languages around it.
 
 ## Setup (first build)
-The large binary assets (the `.aar` engine, the ~63 MB neural model, and the eSpeak-NG data) are **not committed to git** — they are provisioned on demand to keep the repo slim. Before the first build, run:
+The large binary assets (the `.aar` engine, the ~63 MB-per-language neural models, and the eSpeak-NG data) are **not committed to git** — they are provisioned on demand to keep the repo slim. Before the first build, run:
 
 ```bash
 ./download_assets.sh
 ```
 
-This fetches the Sherpa-ONNX AAR, the Piper VITS model, and the eSpeak-NG data into place (one network fetch). After that, the build and the installed app are fully offline.
+This fetches the Sherpa-ONNX AAR and the eSpeak-NG data once, plus one Piper voice model per bundled language (Persian, English, Swedish — see `VOICES` in `download_assets.sh` to add more). If a model fails to fetch, that language is skipped and the script keeps going — re-run it later to fill in the gap. After it succeeds, the build and the installed app are fully offline.
 
 ---
 
@@ -23,10 +25,10 @@ AvaCore is built on a compact, proven, fully-offline stack:
 | Layer | Technology | Notes |
 | :--- | :--- | :--- |
 | **Inference engine** | Sherpa-ONNX 1.10.41 (`app/libs/sherpa-onnx.aar`) | JNI + Kotlin wrapper around ONNX Runtime |
-| **Acoustic + vocoder** | **Piper VITS** (`persian_model.onnx`) | End-to-end model — the HiFi-GAN-style decoder *is* the vocoder; 22.05 kHz |
-| **Grapheme-to-phoneme** | **eSpeak-NG** (`espeak-ng-data/`) | Persian phonemization |
-| **Text front-end** | AvaCore `nlp/` pipeline (Kotlin) | Normalization, number expansion, lexicon, segmentation, SSML |
-| **System integration** | `AvaTtsService : TextToSpeechService` | Serves every app on the device |
+| **Acoustic + vocoder** | **Piper VITS**, one model per language (`assets/tts/model_<lang>.onnx`) | End-to-end model — the HiFi-GAN-style decoder *is* the vocoder; 22.05 kHz. Persian, English, Swedish today. |
+| **Grapheme-to-phoneme** | **eSpeak-NG** (`espeak-ng-data/`, shared across languages) | Persian phonemization is the hard case (see below); English/Swedish rely on eSpeak's own solid support for those languages |
+| **Text front-end** | AvaCore `nlp/` pipeline (Kotlin) | **Persian only:** normalization, number expansion, lexicon, segmentation, SSML. Other languages get SSML + segmentation only — eSpeak's own front end already handles their numbers/punctuation. |
+| **System integration** | `AvaTtsService : TextToSpeechService` | Serves every app on the device; reports all bundled languages via `onGetVoices`/`onIsLanguageAvailable`; each language's model loads lazily on first request |
 
 > Note: VITS is a single end-to-end network. There is **no separate Tacotron front-end or WaveRNN vocoder** in the shipping engine — those belong to the future roadmap below.
 

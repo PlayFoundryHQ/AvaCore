@@ -3,20 +3,28 @@ set -e
 
 # ==============================================================================
 # AvaCore Professional Asset Provisioner - HIGH QUALITY EDITION (Float32)
+# Multi-language: Persian (the heart of it), English, Swedish.
 # ==============================================================================
 
 PROJECT_ROOT="."
 LIBS_DIR="$PROJECT_ROOT/app/libs"
 ASSETS_DIR="$PROJECT_ROOT/app/src/main/assets/tts"
+RELEASE="https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models"
 
 # 1. Sherpa-ONNX Core Engine (AAR) - Stable v1.10.41
 AAR_URL="https://huggingface.co/csukuangfj/sherpa-onnx-libs/resolve/main/android/aar/sherpa-onnx-1.10.41.aar"
 
-# 2, 3 & 4. Neural Persian Model Bundle (Full Quality Float32)
-MODEL_BUNDLE_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-fa_IR-gyro-medium.tar.bz2"
+# 2. Neural voice models (Full Quality Float32). Format per entry:
+#   "<lang code>|<bundle slug>|<onnx basename inside the bundle>"
+# Persian is first — it's AvaCore's primary language and the eager-loaded default.
+VOICES=(
+  "fa|vits-piper-fa_IR-gyro-medium|fa_IR-gyro-medium"
+  "en|vits-piper-en_US-amy-medium|en_US-amy-medium"
+  "sv|vits-piper-sv_SE-nst-medium|sv_SE-nst-medium"
+)
 
-# 5. Linguistic Phonemizer Data (eSpeak-NG)
-ESPEAK_DATA_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/espeak-ng-data.tar.bz2"
+# 3. Linguistic Phonemizer Data (eSpeak-NG) — shared across every language.
+ESPEAK_DATA_URL="$RELEASE/espeak-ng-data.tar.bz2"
 
 echo "🚀 Starting Professional HIGH-QUALITY Asset Provisioning..."
 
@@ -26,29 +34,42 @@ mkdir -p "$LIBS_DIR" "$ASSETS_DIR"
 echo "📥 Syncing Sherpa-ONNX Engine..."
 curl -L "$AAR_URL" -o "$LIBS_DIR/sherpa-onnx.aar" --progress-bar
 
-# --- PART 2, 3 & 4: Model Bundle ---
-echo "📥 Syncing High-Quality Persian Neural Model..."
-curl -L -f "$MODEL_BUNDLE_URL" -o "$ASSETS_DIR/model_bundle.tar.bz2" --progress-bar
+# --- PART 2: Voice models ---
+for entry in "${VOICES[@]}"; do
+    IFS='|' read -r LANG SLUG BASENAME <<< "$entry"
+    MODEL_URL="$RELEASE/$SLUG.tar.bz2"
 
-mkdir -p "$ASSETS_DIR/tmp"
-tar -xjf "$ASSETS_DIR/model_bundle.tar.bz2" -C "$ASSETS_DIR/tmp"
+    echo "📥 Syncing $LANG neural model ($SLUG)..."
+    if ! curl -L -f "$MODEL_URL" -o "$ASSETS_DIR/bundle_$LANG.tar.bz2" --progress-bar; then
+        echo "⚠️  Could not fetch $SLUG — skipping '$LANG'. AvaCore will run without it until you re-run this script."
+        rm -f "$ASSETS_DIR/bundle_$LANG.tar.bz2"
+        continue
+    fi
 
-EXTRACTED_DIR=$(find "$ASSETS_DIR/tmp" -maxdepth 1 -type d -name "vits-piper-fa_IR-gyro-medium" | head -n 1)
+    mkdir -p "$ASSETS_DIR/tmp_$LANG"
+    tar -xjf "$ASSETS_DIR/bundle_$LANG.tar.bz2" -C "$ASSETS_DIR/tmp_$LANG"
 
-if [ -n "$EXTRACTED_DIR" ]; then
-    # استفاده از فایل اصلی .onnx (Float32) برای تضمین کیفیت ۱۰۰٪
-    mv "$EXTRACTED_DIR"/fa_IR-gyro-medium.onnx "$ASSETS_DIR/persian_model.onnx"
-    mv "$EXTRACTED_DIR"/fa_IR-gyro-medium.onnx.json "$ASSETS_DIR/persian_model.onnx.json"
-    mv "$EXTRACTED_DIR"/tokens.txt "$ASSETS_DIR/tokens.txt"
-    echo "💎 High-Quality Float32 Model Provisioned."
-else
-    echo "❌ ERROR: Extraction failed."
-    exit 1
-fi
+    EXTRACTED_DIR=$(find "$ASSETS_DIR/tmp_$LANG" -maxdepth 1 -type d -name "$SLUG" | head -n 1)
+    if [ -z "$EXTRACTED_DIR" ]; then
+        # A few older bundles extract without the wrapper directory.
+        EXTRACTED_DIR="$ASSETS_DIR/tmp_$LANG"
+    fi
 
-rm -rf "$ASSETS_DIR/tmp" "$ASSETS_DIR/model_bundle.tar.bz2"
+    if [ -f "$EXTRACTED_DIR/$BASENAME.onnx" ] && [ -f "$EXTRACTED_DIR/tokens.txt" ]; then
+        # Use the raw .onnx (Float32) for full quality — same convention as the
+        # original Persian-only script.
+        mv "$EXTRACTED_DIR/$BASENAME.onnx" "$ASSETS_DIR/model_$LANG.onnx"
+        mv "$EXTRACTED_DIR/tokens.txt" "$ASSETS_DIR/tokens_$LANG.txt"
+        echo "💎 '$LANG' provisioned ($(ls -lh "$ASSETS_DIR/model_$LANG.onnx" | awk '{print $5}'))."
+    else
+        echo "❌ ERROR: expected files not found for '$LANG' — skipping. Contents were:"
+        find "$EXTRACTED_DIR" -maxdepth 1
+    fi
 
-# --- PART 5: eSpeak-NG Data ---
+    rm -rf "$ASSETS_DIR/tmp_$LANG" "$ASSETS_DIR/bundle_$LANG.tar.bz2"
+done
+
+# --- PART 3: eSpeak-NG Data ---
 if [ ! -d "$ASSETS_DIR/espeak-ng-data" ]; then
     echo "📥 Syncing eSpeak-NG Data..."
     curl -L -f "$ESPEAK_DATA_URL" -o "$ASSETS_DIR/espeak-ng-data.tar.bz2" --progress-bar
@@ -59,6 +80,13 @@ fi
 echo ""
 echo "✅ HIGH-QUALITY Provisioning Complete."
 echo "--------------------------------------------------------"
-echo "Engine: $(ls -lh "$LIBS_DIR/sherpa-onnx.aar")"
-echo "Model:  $(ls -lh "$ASSETS_DIR/persian_model.onnx") (Quality: 100%)"
+echo "Engine: $(ls -lh "$LIBS_DIR/sherpa-onnx.aar" 2>/dev/null || echo 'MISSING')"
+for entry in "${VOICES[@]}"; do
+    IFS='|' read -r LANG _ _ <<< "$entry"
+    if [ -f "$ASSETS_DIR/model_$LANG.onnx" ]; then
+        echo "Model [$LANG]: $(ls -lh "$ASSETS_DIR/model_$LANG.onnx")"
+    else
+        echo "Model [$LANG]: not provisioned"
+    fi
+done
 echo "--------------------------------------------------------"
