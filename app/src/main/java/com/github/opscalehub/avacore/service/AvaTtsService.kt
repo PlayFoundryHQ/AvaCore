@@ -57,7 +57,8 @@ class AvaTtsService : TextToSpeechService() {
         // Bump whenever the bundled model/tokens/espeak/lexicon assets change so
         // stale copies in filesDir are re-extracted on the next launch.
         // v3: multi-language — Persian, English, Swedish.
-        private const val ASSETS_VERSION = 3
+        // v4: expanded lexicon.txt (language-learning + more fixed-ezafe entries).
+        private const val ASSETS_VERSION = 4
 
         // Keep chunks small; some OEM audio paths reject large buffers.
         private const val MAX_CHUNK_BYTES = 8192
