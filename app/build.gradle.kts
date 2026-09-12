@@ -95,6 +95,10 @@ dependencies {
     // Local Sherpa-ONNX Engine
     implementation(files("libs/sherpa-onnx.aar"))
 
+    // tar+bzip2 extraction for on-demand voice downloads (ModelDownloader) —
+    // the same .tar.bz2 format the k2-fsa/sherpa-onnx release bundles ship as.
+    implementation(libs.commons.compress)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
