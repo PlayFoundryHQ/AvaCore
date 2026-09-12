@@ -107,11 +107,11 @@ half of why "nothing seemed to reach AvaCore" for so long.
 | 7 | A real in-app language/voice test screen | ✅ Done | `MainActivity` now builds one button per `VoiceRegistry.VOICES` entry (Persian/English/Swedish), each calling the real `setVoice()` → `speak()` path with a per-language sample phrase and showing the `setVoice()` return code + resulting active voice name on-screen. Verified live: tapping the English button flipped the active voice and produced `synthesize[en]` in logcat — this is exactly the diagnostic that used to require a live adb logcat session to find the `setVoice()` bug. |
 
 ### Phase 3 — The actual ceiling (long-term, research-scale)
-| # | Item | Why |
-|---|---|---|
-| 8 | **Ezafe prediction + homograph disambiguation** (GE2PE-style) | The one thing that would meaningfully close the gap to cloud-quality Persian — see §5. Real ML project: data, training, eval. Weeks, not a quick add. |
-| 9 | Richer normaliser (dates, currency, abbreviations, DadmaTools-style) | Smaller version of the same idea — more robust Persian text handling beyond the current lexicon. |
-| 10 | SSML prosody/emphasis/phoneme tags | Expands expressiveness once core voice quality is settled. |
+| # | Item | Status | Notes |
+|---|---|---|---|
+| 8 | **Ezafe prediction + homograph disambiguation** (GE2PE-style) | ⏳ Not started, by design | Still the one thing that would meaningfully close the gap to cloud-quality Persian — see §5. This is a real ML project (curated training data, a trained model, an eval harness), genuinely weeks of work, not something to sketch in as a coding pass. Deliberately left alone rather than half-built. |
+| 9 | Richer normaliser (dates, currency, abbreviations, DadmaTools-style) | ✅ Done | New `DateCurrencyExpander` (Jalali dates like `۱۴۰۴/۳/۱۲` → "دوازدهم خرداد هزار و چهارصد و چهار"; currency symbols `$€£﷼₹` → the number followed by the Persian unit word) and `AbbreviationExpander` (a deliberately short, conservative list — "ه.ش" → "هجری شمسی", "ق.م" → "قبل از میلاد", plus `kg`/`km`/`cm`/`mm`). Both run early in `TextProcessor.pipeline()`, before `NumberToWords.expand`. Single-letter/ambiguous abbreviations were left out on purpose — a wrong expansion is worse than reading the raw letters. |
+| 10 | SSML prosody/emphasis/phoneme tags | ⚠️ Partial — prosody/emphasis done, phoneme out of scope | `<prosody rate="..." pitch="...">` (keywords, percentages) and `<emphasis level="strong\|moderate\|reduced">` now carry real per-segment rate/pitch multipliers through `SpeakUnit` into `AvaTtsService`'s `generate`/`generateWithCallback` calls — verified live on-device (base speed 1.22 → 2.0 under `rate="200%"`, clamped correctly at `MAX_SPEED`; strong emphasis → 1.22×0.9=1.098 speed, 1.03×1.05=1.0815 pitch, exact match). `<phoneme>` is **not implemented**: sherpa-onnx's Piper wrapper only accepts plain text and phonemizes internally via eSpeak — there's no seam to inject an explicit IPA/x-sampa pronunciation per word without engine-level changes. Documented here rather than faked. |
 
 ## 4. Original roadmap items (carried over, still open)
 

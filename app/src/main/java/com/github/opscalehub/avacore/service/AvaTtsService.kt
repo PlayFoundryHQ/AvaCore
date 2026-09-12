@@ -331,7 +331,6 @@ class AvaTtsService : TextToSpeechService() {
         // as a post-process (SOLA) only when non-default; the default path streams
         // untouched audio at full speed.
         val pitchFactor = (request.pitch / 100f).coerceIn(0.5f, 2.0f)
-        val applyPitch = abs(pitchFactor - 1f) >= 0.01f
         Log.d(TAG, "synthesize[${voice.lang}]: rate=${request.speechRate} pitch=${request.pitch} " +
             "len=${rawText.length} text='${rawText.take(60).replace('\n', ' ')}'")
 
@@ -350,13 +349,18 @@ class AvaTtsService : TextToSpeechService() {
             for (unit in units) {
                 if (isInterrupted.get() || isDestroyed.get()) break
                 if (unit.text.isNotBlank()) {
-                    if (applyPitch) {
+                    // Fold in any SSML <prosody>/<emphasis> multiplier this unit
+                    // carries — 1f for plain text, so this is a no-op for the
+                    // common case.
+                    val unitSpeed = (speed * unit.rateMultiplier).coerceIn(MIN_SPEED, MAX_SPEED)
+                    val unitPitch = (pitchFactor * unit.pitchMultiplier).coerceIn(0.5f, 2.0f)
+                    if (abs(unitPitch - 1f) >= 0.01f) {
                         // Pitch path: synthesize the (short) sentence, shift, then write.
-                        val audio = engine.generate(unit.text, 0, speed)
+                        val audio = engine.generate(unit.text, 0, unitSpeed)
                         if (isInterrupted.get() || isDestroyed.get()) break
-                        writer.write(PitchShifter.process(audio.samples, pitchFactor))
+                        writer.write(PitchShifter.process(audio.samples, unitPitch))
                     } else {
-                        engine.generateWithCallback(unit.text, 0, speed) { chunk ->
+                        engine.generateWithCallback(unit.text, 0, unitSpeed) { chunk ->
                             writer.write(chunk)
                             if (isInterrupted.get() || isDestroyed.get()) 0 else 1
                         }

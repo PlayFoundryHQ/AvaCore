@@ -27,7 +27,7 @@ object SentenceSegmenter {
     private val SENTENCE_END = setOf('.', '؟', '!', '?')
     private val CLAUSE_END = setOf('؛', ':')
 
-    fun split(text: String): List<SpeakUnit> {
+    fun split(text: String, rateMultiplier: Float = 1f, pitchMultiplier: Float = 1f): List<SpeakUnit> {
         val units = ArrayList<SpeakUnit>()
         val sb = StringBuilder()
         var newlineRun = 0
@@ -35,7 +35,7 @@ object SentenceSegmenter {
         fun flush(pause: Int) {
             val unit = sb.toString().trim()
             sb.setLength(0)
-            if (unit.isNotEmpty()) units.add(SpeakUnit(unit, pause))
+            if (unit.isNotEmpty()) units.add(SpeakUnit(unit, pause, rateMultiplier, pitchMultiplier))
         }
 
         var i = 0
