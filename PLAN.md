@@ -100,11 +100,11 @@ half of why "nothing seemed to reach AvaCore" for so long.
 | 4 | *(manual, not code)* Fix the `release-please` Actions permission | ⏳ Deferred to user | Needs repo admin: Settings → Actions → General → Workflow permissions → "Allow GitHub Actions to create and approve pull requests." Blocked from being done via API (Claude Code's own auto-mode classifier refuses org/repo security-permission changes on the user's behalf) — this is intentional and by design, not a bug. |
 
 ### Phase 2 — Medium effort, real payoff
-| # | Item | Why |
-|---|---|---|
-| 5 | On-demand model download instead of bundling all languages in the APK | Every install currently carries every language (~190MB). Downloading a voice on first use (the same fetch `download_assets.sh` does at dev-time, run from the live app instead) shrinks the install and lets new languages be added without a full app update. |
-| 6 | NNAPI hardware-acceleration trial | Already on the original roadmap (§4). Faster, lower-power inference via the NPU/GPU execution provider — matters more as bigger/better models get added. |
-| 7 | A real in-app language/voice test screen | `MainActivity` is still a single hardcoded-Persian test button. A "test every installed voice" screen would double as living documentation and would have surfaced the `setVoice()` bug immediately instead of needing a live debugging session to find it. |
+| # | Item | Status | Notes |
+|---|---|---|---|
+| 5 | On-demand model download instead of bundling all languages in the APK | ⏳ Not started | Every install currently carries every language (~190MB). Downloading a voice on first use (the same fetch `download_assets.sh` does at dev-time, run from the live app instead) shrinks the install and lets new languages be added without a full app update. Biggest architectural lift of the three — touches storage, permissions, and the service's init/gating path. |
+| 6 | NNAPI hardware-acceleration trial | ✅ Tried, self-fallback confirmed | `createOfflineTts()` now tries `provider = "nnapi"` first, catching init failure and falling back to `"cpu"`. Verified live on-device: sherpa-onnx's own native layer logs `"Android NNAPI requires API level >= 27... Fallback to cpu!"` and runs on CPU regardless — this AAR build's own API-level gate never actually engages NNAPI on this hardware, independent of our try/catch. No crash, no regression, but also no measured speedup here; leaving the nnapi-first attempt in since it's free and may pay off on a device/AAR build where the gate passes. Real before/after latency numbers would need a newer AAR build or a different device — not chased further this pass. |
+| 7 | A real in-app language/voice test screen | ✅ Done | `MainActivity` now builds one button per `VoiceRegistry.VOICES` entry (Persian/English/Swedish), each calling the real `setVoice()` → `speak()` path with a per-language sample phrase and showing the `setVoice()` return code + resulting active voice name on-screen. Verified live: tapping the English button flipped the active voice and produced `synthesize[en]` in logcat — this is exactly the diagnostic that used to require a live adb logcat session to find the `setVoice()` bug. |
 
 ### Phase 3 — The actual ceiling (long-term, research-scale)
 | # | Item | Why |

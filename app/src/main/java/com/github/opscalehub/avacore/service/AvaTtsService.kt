@@ -101,6 +101,39 @@ class AvaTtsService : TextToSpeechService() {
         }
     }
 
+    /**
+     * Tries the NNAPI execution provider first (NPU/GPU offload — faster and
+     * lower-power than CPU on hardware that actually supports it), falling
+     * back to plain "cpu" if NNAPI init throws. sherpa-onnx/onnxruntime does
+     * not expose a clean "is NNAPI actually available" check ahead of time —
+     * some devices accept the config but silently run the graph on CPU
+     * anyway, so this only guarantees "doesn't crash," not "is faster." Real
+     * before/after latency needs an on-device A/B, tracked as a PLAN.md
+     * follow-up rather than assumed here.
+     */
+    private fun createOfflineTts(vitsConfig: OfflineTtsVitsModelConfig, cpuThreads: Int, lang: String): OfflineTts {
+        val nnapiConfig = OfflineTtsModelConfig(
+            vits = vitsConfig,
+            numThreads = cpuThreads,
+            debug = false,
+            provider = "nnapi"
+        )
+        try {
+            val tts = OfflineTts(config = OfflineTtsConfig(model = nnapiConfig))
+            Log.d(TAG, "'$lang' engine initialized with the nnapi execution provider")
+            return tts
+        } catch (e: Throwable) {
+            Log.w(TAG, "nnapi provider failed to initialize for '$lang' — falling back to cpu", e)
+        }
+        val cpuConfig = OfflineTtsModelConfig(
+            vits = vitsConfig,
+            numThreads = cpuThreads,
+            debug = false,
+            provider = "cpu"
+        )
+        return OfflineTts(config = OfflineTtsConfig(model = cpuConfig))
+    }
+
     private fun prepareAndInitialize(voice: VoiceModel) {
         ensureAssets()
         if (isDestroyed.get()) return
@@ -128,14 +161,7 @@ class AvaTtsService : TextToSpeechService() {
             .coerceIn(1, 4)
         Log.d(TAG, "Initializing '${voice.lang}' engine with $cpuThreads threads")
 
-        val modelConfig = OfflineTtsModelConfig(
-            vits = vitsConfig,
-            numThreads = cpuThreads,
-            debug = false,
-            provider = "cpu"
-        )
-
-        val newTts = OfflineTts(config = OfflineTtsConfig(model = modelConfig))
+        val newTts = createOfflineTts(vitsConfig, cpuThreads, voice.lang)
 
         val processor = if (voice.usePersianPipeline) {
             // The Persian text front-end (lexicon is optional / best-effort).
