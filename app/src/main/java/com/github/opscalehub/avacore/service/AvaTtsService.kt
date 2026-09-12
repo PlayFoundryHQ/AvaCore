@@ -24,19 +24,6 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
-/** One bundled Piper voice. Persian gets the full NLP front-end (ezafe,
- *  number expansion, script normalisation) because eSpeak-NG's own Persian
- *  support is weak; other languages' eSpeak front ends already handle
- *  numbers/punctuation, so they go straight to segmentation. */
-private data class VoiceModel(
-    val lang: String,
-    val locale: Locale,
-    val voiceName: String,
-    val modelAsset: String,
-    val tokensAsset: String,
-    val usePersianPipeline: Boolean,
-)
-
 /**
  * AvaTtsService: an offline-first, streaming, **multi-language** TTS engine —
  * Persian (its heart), English and Swedish today.
@@ -80,39 +67,13 @@ class AvaTtsService : TextToSpeechService() {
         // engine speed multiplier, clamped to a sane musical range.
         private const val MIN_SPEED = 0.5f
         private const val MAX_SPEED = 2.0f
-
-        // Persian is listed first: it's AvaCore's primary language and the
-        // default reported by onGetLanguage(). Run `download_assets.sh` to
-        // provision the bundled model/tokens files for all three.
-        private val VOICES = listOf(
-            VoiceModel(
-                lang = "fa", locale = Locale("fa", "IR"), voiceName = "fa-ir-ava-premium",
-                modelAsset = "model_fa.onnx", tokensAsset = "tokens_fa.txt", usePersianPipeline = true,
-            ),
-            VoiceModel(
-                lang = "en", locale = Locale.US, voiceName = "en-us-ava-premium",
-                modelAsset = "model_en.onnx", tokensAsset = "tokens_en.txt", usePersianPipeline = false,
-            ),
-            VoiceModel(
-                lang = "sv", locale = Locale("sv", "SE"), voiceName = "sv-se-ava-premium",
-                modelAsset = "model_sv.onnx", tokensAsset = "tokens_sv.txt", usePersianPipeline = false,
-            ),
-        )
-
-        /** Some framework call sites pass a 2-letter code ("en"), others the
-         *  ISO-3 form ("eng") — match either against both [VoiceModel.lang]
-         *  and the locale's own ISO-3 language. */
-        private fun voiceForLang(lang: String?): VoiceModel? {
-            if (lang.isNullOrBlank()) return null
-            return VOICES.firstOrNull {
-                it.lang.equals(lang, ignoreCase = true) ||
-                    runCatching { it.locale.isO3Language }.getOrNull()?.equals(lang, ignoreCase = true) == true
-            }
-        }
-
-        private fun voiceForName(name: String?): VoiceModel? =
-            VOICES.firstOrNull { it.voiceName == name }
     }
+
+    // The voice list + lookup live in VoiceRegistry (pure Kotlin, no Android
+    // deps) so they're unit-testable without a device/emulator.
+    private val VOICES get() = VoiceRegistry.VOICES
+    private fun voiceForLang(lang: String?) = VoiceRegistry.voiceForLang(lang)
+    private fun voiceForName(name: String?) = VoiceRegistry.voiceForName(name)
 
     override fun onCreate() {
         Log.d(TAG, "onCreate: Initializing AvaCore TTS")

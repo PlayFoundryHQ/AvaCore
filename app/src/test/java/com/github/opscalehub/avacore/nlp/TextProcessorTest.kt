@@ -25,4 +25,22 @@ class TextProcessorTest {
         val units = p.process("Hej   dar   varlden")
         assertEquals("Hej dar varlden", units.single().text)
     }
+
+    @Test fun `say-as digits spell out with Persian cardinal words in the Persian pipeline`() {
+        val p = TextProcessor(PronunciationLexicon.fromStream(null), applyPersianPipeline = true)
+        val units = p.process("<speak><say-as interpret-as=\"digits\">35</say-as></speak>")
+        val text = units.joinToString(" ") { it.text }
+        assert(text.contains("،")) { "expected the Persian comma separator, got: $text" }
+        assert(!text.contains("3") && !text.contains("5")) { "expected digits expanded to Persian words, got: $text" }
+    }
+
+    @Test fun `say-as digits spell out with plain separators in the generic pipeline`() {
+        val p = TextProcessor(PronunciationLexicon.fromStream(null), applyPersianPipeline = false)
+        val units = p.process("<speak><say-as interpret-as=\"digits\">35</say-as></speak>")
+        val text = units.joinToString(" ") { it.text }
+        // Generic path leaves the digits as characters — no Persian words, no
+        // Persian comma — and lets eSpeak's own per-language reader take it
+        // from there.
+        assertEquals("3, 5", text)
+    }
 }
