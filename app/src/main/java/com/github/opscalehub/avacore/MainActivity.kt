@@ -31,7 +31,8 @@ class MainActivity : AppCompatActivity() {
     // languages that don't need the custom NLP pipeline.
     private val sampleTextFor: Map<String, String> = mapOf(
         "fa" to "سلام! این موتور بازگوکننده آوا است. " +
-            "امروز ۱۲ خرداد ۱۴۰۴ است، دمای هوا ۳۵ درجه و رطوبت ۲۰٪ می‌باشد.",
+            "امروز ۱۲ خرداد ۱۴۰۴ است، دمای هوا ۳۵ درجه و رطوبت ۲۰٪ می‌باشد. " +
+            "زبان مادری من فارسی است.",
         "en" to "Hello! This is the Ava voice engine speaking English. " +
             "Today is September the twelfth, and it's thirty five degrees outside.",
         "sv" to "Hej! Det här är Ava-rösten som talar svenska. " +
