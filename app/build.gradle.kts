@@ -14,7 +14,7 @@ android {
 
         // versionName is managed by release-please (do not edit by hand — bump via
         // conventional commits). versionCode is derived from it so it stays monotonic.
-        val releaseVersion = "1.1.0" // x-release-please-version
+        val releaseVersion = "1.2.0" // x-release-please-version
         versionName = releaseVersion
         versionCode = releaseVersion.split(".").map { it.toIntOrNull() ?: 0 }
             .let { (it.getOrElse(0) { 0 }) * 1_000_000 + (it.getOrElse(1) { 0 }) * 1_000 + (it.getOrElse(2) { 0 }) }
