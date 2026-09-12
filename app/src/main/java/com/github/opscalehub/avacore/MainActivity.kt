@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.Voice
 import android.util.Log
 import android.view.ViewGroup
@@ -86,7 +87,25 @@ class MainActivity : AppCompatActivity() {
             ttsReady = status == TextToSpeech.SUCCESS
             if (!ttsReady) {
                 Log.e("MainActivity", "TTS initialization failed")
+                return@TextToSpeech
             }
+            // English/Swedish aren't bundled in the APK — the first request
+            // for either kicks off a one-time on-device download
+            // (ModelDownloader) that can easily outlast the framework's own
+            // synthesis wait, so that first tap fails with onError() rather
+            // than hanging. Surface that as a "try again" hint instead of a
+            // silent/confusing failure.
+            tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) {}
+                override fun onDone(utteranceId: String?) {}
+                @Deprecated("Deprecated in Java")
+                override fun onError(utteranceId: String?) {
+                    runOnUiThread {
+                        tvVoiceResult.text = "⏳ Not cached yet — downloading this voice in the background. " +
+                            "Wait a few seconds and tap again."
+                    }
+                }
+            })
         }
     }
 

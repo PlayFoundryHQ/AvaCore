@@ -143,8 +143,18 @@ class AvaTtsService : TextToSpeechService() {
         val espeakDir = File(filesDir, ESPEAK_DIR)
 
         if (!modelFile.exists() || tokensFile.length() == 0L) {
-            Log.w(TAG, "No bundled model for '${voice.lang}' — run download_assets.sh; that voice stays unavailable")
-            return
+            if (voice.bundledInApk) {
+                Log.w(TAG, "No bundled model for '${voice.lang}' — run download_assets.sh; that voice stays unavailable")
+                return
+            }
+            // Not shipped in the APK (keeps the install small) — fetch it now,
+            // on this dedicated per-language background thread, so the very
+            // first non-Persian request pays a one-time download instead of
+            // every install paying for every language.
+            if (!ModelDownloader.ensureModel(voice, filesDir)) {
+                Log.w(TAG, "Could not download model for '${voice.lang}' — that voice stays unavailable this attempt")
+                return
+            }
         }
 
         val vitsConfig = OfflineTtsVitsModelConfig(

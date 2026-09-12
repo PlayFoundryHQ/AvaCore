@@ -3,7 +3,10 @@ set -e
 
 # ==============================================================================
 # AvaCore Professional Asset Provisioner - HIGH QUALITY EDITION (Float32)
-# Multi-language: Persian (the heart of it), English, Swedish.
+# Bundles Persian (the heart of it) into the APK. English and Swedish are NOT
+# bundled — AvaTtsService's ModelDownloader fetches them on-device the first
+# time they're actually requested, so the install stays small. See PLAN.md
+# Phase 2 item 5.
 # ==============================================================================
 
 PROJECT_ROOT="."
@@ -14,13 +17,14 @@ RELEASE="https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models"
 # 1. Sherpa-ONNX Core Engine (AAR) - Stable v1.10.41
 AAR_URL="https://huggingface.co/csukuangfj/sherpa-onnx-libs/resolve/main/android/aar/sherpa-onnx-1.10.41.aar"
 
-# 2. Neural voice models (Full Quality Float32). Format per entry:
+# 2. Bundled voice models (Full Quality Float32). Format per entry:
 #   "<lang code>|<bundle slug>|<onnx basename inside the bundle>"
-# Persian is first — it's AvaCore's primary language and the eager-loaded default.
+# Keep this in sync with VoiceRegistry.kt's bundledInApk=true entries — only
+# Persian belongs here. English/Swedish use the same slug/basename convention
+# in VoiceRegistry (bundleSlug/onnxBasename) but are fetched at runtime by
+# ModelDownloader instead of by this script.
 VOICES=(
   "fa|vits-piper-fa_IR-gyro-medium|fa_IR-gyro-medium"
-  "en|vits-piper-en_US-amy-medium|en_US-amy-medium"
-  "sv|vits-piper-sv_SE-nst-medium|sv_SE-nst-medium"
 )
 
 # 3. Linguistic Phonemizer Data (eSpeak-NG) — shared across every language.
@@ -34,7 +38,7 @@ mkdir -p "$LIBS_DIR" "$ASSETS_DIR"
 echo "📥 Syncing Sherpa-ONNX Engine..."
 curl -L "$AAR_URL" -o "$LIBS_DIR/sherpa-onnx.aar" --progress-bar
 
-# --- PART 2: Voice models ---
+# --- PART 2: Bundled voice models ---
 for entry in "${VOICES[@]}"; do
     IFS='|' read -r LANG SLUG BASENAME <<< "$entry"
     MODEL_URL="$RELEASE/$SLUG.tar.bz2"
@@ -89,4 +93,5 @@ for entry in "${VOICES[@]}"; do
         echo "Model [$LANG]: not provisioned"
     fi
 done
+echo "English/Swedish: not bundled — fetched on-device on first use (ModelDownloader)."
 echo "--------------------------------------------------------"

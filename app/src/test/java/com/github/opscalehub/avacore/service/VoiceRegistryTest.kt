@@ -34,6 +34,19 @@ class VoiceRegistryTest {
         }
     }
 
+    @Test fun `only Persian is bundled in the APK — others are fetched on demand`() {
+        VoiceRegistry.VOICES.forEach {
+            assertEquals(it.lang == "fa", it.bundledInApk)
+        }
+    }
+
+    @Test fun `every voice has a non-blank download bundle slug and onnx basename`() {
+        VoiceRegistry.VOICES.forEach {
+            assertTrue("bundleSlug missing for ${it.lang}", it.bundleSlug.isNotBlank())
+            assertTrue("onnxBasename missing for ${it.lang}", it.onnxBasename.isNotBlank())
+        }
+    }
+
     @Test fun `voiceForLang matches the 2-letter code`() {
         assertEquals("fa-ir-ava-premium", VoiceRegistry.voiceForLang("fa")?.voiceName)
         assertEquals("en-us-ava-premium", VoiceRegistry.voiceForLang("en")?.voiceName)
