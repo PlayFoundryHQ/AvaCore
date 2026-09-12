@@ -1,65 +1,97 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:gravity="center"
-    android:orientation="vertical"
-    android:padding="24dp">
+    android:layout_height="match_parent">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/app_name"
-        android:textSize="28sp"
-        android:textStyle="bold"
-        android:textColor="?android:attr/textColorPrimary" />
-
-    <TextView
-        android:id="@+id/tvStatus"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Checking status..."
-        android:textAlignment="center"
-        android:textSize="16sp"
-        android:lineSpacingExtra="4dp" />
-
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_marginTop="24dp"
-        android:background="?android:attr/dividerVertical"
-        android:alpha="0.2" />
-
-    <Button
-        android:id="@+id/btnTestTts"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="🔊 Play Sample Speech"
-        style="@style/Widget.AppCompat.Button.Colored" />
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="24dp">
 
-    <Button
-        android:id="@+id/btnOpenSettings"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="⚙️ Open TTS Settings" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorPrimary" />
 
-    <Button
-        android:id="@+id/btnBatteryOptimization"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="🔋 Fix Battery Restrictions" />
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Checking status..."
+            android:textAlignment="center"
+            android:textSize="16sp"
+            android:lineSpacingExtra="4dp" />
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="Note for Oppo/Oplus: Enable 'Allow background activity' and 'Allow autostart' for consistent performance."
-        android:textAlignment="center"
-        android:textSize="12sp"
-        android:alpha="0.6" />
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="24dp"
+            android:background="?android:attr/dividerVertical"
+            android:alpha="0.2" />
 
-</LinearLayout>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Test every installed voice:"
+            android:textSize="14sp"
+            android:alpha="0.8" />
+
+        <!-- Populated at runtime, one row per VoiceRegistry.VOICES entry —
+             this is the living documentation of what's actually bundled, and
+             is what would have surfaced the setVoice() bug immediately
+             instead of needing a live debugging session to find it. -->
+        <LinearLayout
+            android:id="@+id/voiceButtonsContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="vertical" />
+
+        <TextView
+            android:id="@+id/tvVoiceResult"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textAlignment="center"
+            android:textSize="13sp"
+            android:alpha="0.85" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="24dp"
+            android:background="?android:attr/dividerVertical"
+            android:alpha="0.2" />
+
+        <Button
+            android:id="@+id/btnOpenSettings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="⚙️ Open TTS Settings" />
+
+        <Button
+            android:id="@+id/btnBatteryOptimization"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="🔋 Fix Battery Restrictions" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Note for Oppo/Oplus: Enable 'Allow background activity' and 'Allow autostart' for consistent performance."
+            android:textAlignment="center"
+            android:textSize="12sp"
+            android:alpha="0.6" />
+
+    </LinearLayout>
+</ScrollView>
