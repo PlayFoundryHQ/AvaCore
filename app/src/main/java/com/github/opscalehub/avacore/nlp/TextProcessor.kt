@@ -65,8 +65,14 @@ class TextProcessor(
         return s
     }
 
-    /** For SSML say-as characters/digits: read each character individually. */
+    /** For SSML say-as characters/digits: read each character individually.
+     *  Non-Persian languages skip the Persian cardinal-word conversion and
+     *  comma separator — eSpeak reads a single digit character natively in
+     *  its own language, so a plain Latin comma between characters is enough. */
     private fun spellOut(text: String): String {
+        if (!applyPersianPipeline) {
+            return text.trim().filterNot { it.isWhitespace() }.toList().joinToString(", ") { it.toString() }
+        }
         val sb = StringBuilder()
         for (c in NumberToWords.foldDigits(text.trim())) {
             if (c.isWhitespace()) continue
