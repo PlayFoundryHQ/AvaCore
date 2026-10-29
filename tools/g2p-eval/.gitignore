@@ -1,3 +1,4 @@
 .cache/
 .venv/
-report-*.tsv
+__pycache__/
+report*.tsv

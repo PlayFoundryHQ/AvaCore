@@ -19,7 +19,7 @@ and conventional-commit messages. You never tag or version by hand.
 4. The `build-and-attach` job provisions the offline models, builds a **signed
    release APK** and uploads it to that release as `avacore-latest.apk`.
 5. The landing page (`docs/index.html`) already links to
-   `https://github.com/OpScaleHub/AvaCore/releases/latest/download/avacore-latest.apk`,
+   `https://github.com/PlayFoundryHQ/AvaCore/releases/latest/download/avacore-latest.apk`,
    which always resolves to the newest release — no page redeploy needed for a new APK.
 
 `android.yml` still runs a debug build on every PR/push and redeploys the landing
