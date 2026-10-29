@@ -30,22 +30,44 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
 ASSETS = ROOT / "app/src/main/assets/tts"
 TIHU_URL = "https://raw.githubusercontent.com/tihu-nlp/tihudict/master/tihu.demo.dict"
+IPADICT_URL = "https://raw.githubusercontent.com/open-dict-data/ipa-dict/master/data/fa.txt"
 
 TIHU_VOWELS = {"A": "A", "a": "a", "e": "e", "o": "o", "i": "i", "u": "u"}
 IPA_VOWELS = {"ɑ": "A", "ɒ": "A", "a": "a", "æ": "a", "e": "e", "ə": "e", "o": "o", "i": "i", "u": "u"}
+REFERENCES = ("gold", "tihu", "ipadict")
 
 
-def load_reference(cache: Path) -> dict:
-    path = cache / "tihu.demo.dict"
+def fetch(cache: Path, name: str, url: str) -> Path:
+    path = cache / name
     if not path.exists():
         cache.mkdir(parents=True, exist_ok=True)
-        urllib.request.urlretrieve(TIHU_URL, path)
+        urllib.request.urlretrieve(url, path)
+    return path
+
+
+def load_reference(cache: Path, which: str) -> dict:
     ref = defaultdict(set)
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if "\t" not in line:
-            continue
-        word, phones = line.split("\t", 1)
-        ref[word.strip()].add("".join(TIHU_VOWELS.get(p, "") for p in phones.split()))
+    if which == "gold":
+        for line in (HERE / "gold.tsv").read_text(encoding="utf-8").splitlines():
+            if line.startswith("#") or "\t" not in line:
+                continue
+            word, want = line.split("\t", 1)
+            ref[word.strip()].add(want.strip())
+    elif which == "tihu":
+        for line in fetch(cache, "tihu.demo.dict", TIHU_URL).read_text(encoding="utf-8").splitlines():
+            if "\t" not in line:
+                continue
+            word, phones = line.split("\t", 1)
+            ref[word.strip()].add("".join(TIHU_VOWELS.get(p, "") for p in phones.split()))
+    else:  # ipadict: "word\t/ipa/, /ipa2/"; single words only
+        for line in fetch(cache, "ipadict-fa.txt", IPADICT_URL).read_text(encoding="utf-8").splitlines():
+            if "\t" not in line:
+                continue
+            word, prons = line.split("\t", 1)
+            if " " in word.strip():
+                continue
+            for p in prons.split(","):
+                ref[word.strip()].add(vowels(p.strip().strip("/")))
     return ref
 
 
@@ -63,7 +85,7 @@ def load_lexicon(path: Path) -> dict:
 def vowels(ipa: str) -> str:
     """Vowel skeleton of an eSpeak IPA string, e.g. "ketˈɑb" -> "eA". An "i"
     sitting between two vowels is the glide y (eSpeak writes آیا as "ɑiɑ"),
-    not a vowel, so it's dropped to match the reference's consonant y."""
+    not a vowel, so it's dropped to match the references' consonant y."""
     seg = [c for c in ipa if c not in "ˈˌː"]
     out = []
     for n, c in enumerate(seg):
@@ -87,14 +109,18 @@ class Espeak:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--reference", choices=REFERENCES, default="gold",
+                    help="gold: AvaCore's own hand-written gold.tsv; tihu: tihudict (GPL-3, ~1.9k common words); "
+                         "ipadict: open-dict-data/ipa-dict fa (MIT, ~7k words, self-described experimental)")
     ap.add_argument("--cache", type=Path, default=HERE / ".cache")
     ap.add_argument("--lexicon", type=Path, default=ASSETS / "lexicon.txt")
     ap.add_argument("--espeak-data", type=Path, default=ASSETS / "espeak-ng-data")
-    ap.add_argument("--report", type=Path, default=HERE / "report.tsv")
+    ap.add_argument("--report", type=Path, help="default: report-<reference>.tsv")
     ap.add_argument("--word", help="show the analysis for one word and exit")
     args = ap.parse_args()
+    args.report = args.report or HERE / f"report-{args.reference}.tsv"
 
-    ref = load_reference(args.cache)
+    ref = load_reference(args.cache, args.reference)
     lex = load_lexicon(args.lexicon)
     es = Espeak(args.espeak_data)
 

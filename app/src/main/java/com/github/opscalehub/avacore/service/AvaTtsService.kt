@@ -58,7 +58,7 @@ class AvaTtsService : TextToSpeechService() {
         // stale copies in filesDir are re-extracted on the next launch.
         // v3: multi-language — Persian, English, Swedish.
         // v4: expanded lexicon.txt (language-learning + more fixed-ezafe entries).
-        private const val ASSETS_VERSION = 4
+        private const val ASSETS_VERSION = 5
 
         // Keep chunks small; some OEM audio paths reject large buffers.
         private const val MAX_CHUNK_BYTES = 8192

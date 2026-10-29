@@ -16,8 +16,10 @@ package com.github.opscalehub.avacore.nlp
  */
 object NumberToWords {
 
+    // Nine is written «نُه»: bare «نه» is also "no", and eSpeak-NG reads it
+    // as "na". (The ordinal goes back to bare «نهم», which eSpeak reads right.)
     private val ONES = arrayOf(
-        "", "یک", "دو", "سه", "چهار", "پنج", "شش", "هفت", "هشت", "نه"
+        "", "یک", "دو", "سه", "چهار", "پنج", "شش", "هفت", "هشت", "نُه"
     )
     private val TEENS = arrayOf(
         "ده", "یازده", "دوازده", "سیزده", "چهارده", "پانزده",
@@ -139,7 +141,7 @@ object NumberToWords {
             cardinal == "یک" -> "اول"
             cardinal.endsWith("سه") -> cardinal.dropLast(2) + "سوم"
             cardinal.endsWith("سی") -> cardinal + "‌ام"   // سی‌ام
-            cardinal.endsWith("نُه") || cardinal.endsWith("نه") -> cardinal + "م"
+            cardinal.endsWith("نُه") -> cardinal.dropLast(3) + "نهم"
             else -> cardinal + "م"
         }
     }
