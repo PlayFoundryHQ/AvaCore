@@ -103,3 +103,6 @@ Full detail, verification notes and status live in **`PLAN.md`** — this is the
 
 ---
 AvaCore aims to set a new standard for Persian accessibility on Android: a robust, offline, high-quality voice for navigators, screen readers and virtual assistants.
+
+## License
+AvaCore is free software under the **GNU GPL v3.0 or later** (`LICENSE`) — required anyway, since it ships eSpeak NG (GPL-3.0-or-later). Bundled components and their licenses are listed in [`THIRD_PARTY.md`](THIRD_PARTY.md).
