@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/PlayFoundryHQ/AvaCore/compare/v2.0.0...v2.0.1) (2026-10-29)
+
+
+### Bug Fixes
+
+* read a day number before a month name as an ordinal ([4cc27ce](https://github.com/PlayFoundryHQ/AvaCore/commit/4cc27cef41d61628b149420362fcb948eb1d80d8))
+
 ## [2.0.0](https://github.com/PlayFoundryHQ/AvaCore/compare/v1.3.0...v2.0.0) (2026-10-29)
 
 
