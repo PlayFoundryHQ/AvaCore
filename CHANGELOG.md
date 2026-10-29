@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.0](https://github.com/PlayFoundryHQ/AvaCore/compare/v1.2.0...v1.3.0) (2026-10-29)
+
+
+### Features
+
+* fix the Persian words eSpeak reads with wrong vowels ([c535adf](https://github.com/PlayFoundryHQ/AvaCore/commit/c535adf30cb1cf98fee53e9ffd7727f2b3d20e20))
+* fix the Persian words eSpeak reads with wrong vowels ([425a456](https://github.com/PlayFoundryHQ/AvaCore/commit/425a456f58d609bab36615b6d3883f9daf731cd6))
+* Goftari mode — read Persian the way it is spoken ([a7cc2b3](https://github.com/PlayFoundryHQ/AvaCore/commit/a7cc2b3855d9d8fb4ebfbb626687c95fd3d1d74e))
+* Goftari mode — read Persian the way it is spoken ([cfdb075](https://github.com/PlayFoundryHQ/AvaCore/commit/cfdb075d3cb935b1be80100595452c3d5f289523))
+* natural pauses for verse, ellipses, dashes and lists ([2e9c744](https://github.com/PlayFoundryHQ/AvaCore/commit/2e9c7442c97438cb814ec0746bfbb1b9554880c1))
+* natural pauses for verse, ellipses, dashes and lists ([1437fe6](https://github.com/PlayFoundryHQ/AvaCore/commit/1437fe6950f1be079c3c7b7e45b6aba10fb44f51))
+
 ## [1.2.0](https://github.com/PlayFoundryHQ/AvaCore/compare/v1.1.0...v1.2.0) (2026-10-24)
 
 
