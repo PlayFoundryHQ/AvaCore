@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/PlayFoundryHQ/AvaCore/compare/v1.3.0...v2.0.0) (2026-10-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* AvaCore no longer speaks English or Swedish; apps asking for those languages get LANG_NOT_SUPPORTED and fall back to another engine.
+
+### Features
+
+* Persian-only engine, spoken (Goftari) Persian by default ([fd2b02e](https://github.com/PlayFoundryHQ/AvaCore/commit/fd2b02e0b3490c95b33e5887bff7eda4ed2726ac))
+
 ## [1.3.0](https://github.com/PlayFoundryHQ/AvaCore/compare/v1.2.0...v1.3.0) (2026-10-29)
 
 
