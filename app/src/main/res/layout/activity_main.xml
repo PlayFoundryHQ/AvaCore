@@ -35,6 +35,32 @@
             android:background="?android:attr/dividerVertical"
             android:alpha="0.2" />
 
+        <!-- Global Goftari switch: read every app's Persian the way it's spoken.
+             Apps can also pick the fa-ir-ava-goftari voice, or wrap text in
+             <say-as interpret-as="colloquial|formal"> — see GoftariRewriter. -->
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/switchGoftari"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="لحن گفتاری برای فارسی (Goftari)"
+            android:textSize="16sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="فارسیِ همهٔ برنامه‌ها را محاوره‌ای می‌خواند: «می‌خواهم بروم» ← «میخوام برم». Spoken Persian for every app."
+            android:textSize="12sp"
+            android:alpha="0.7" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="24dp"
+            android:background="?android:attr/dividerVertical"
+            android:alpha="0.2" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

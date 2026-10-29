@@ -16,11 +16,28 @@ import org.junit.Test
  */
 class VoiceRegistryTest {
 
-    @Test fun `every bundled voice has a unique lang and voiceName`() {
-        val langs = VoiceRegistry.VOICES.map { it.lang }
+    @Test fun `every voice has a unique voiceName, and one formal voice per lang`() {
         val names = VoiceRegistry.VOICES.map { it.voiceName }
-        assertEquals(langs.size, langs.toSet().size)
         assertEquals(names.size, names.toSet().size)
+        val formalLangs = VoiceRegistry.VOICES.filter { !it.colloquial }.map { it.lang }
+        assertEquals(formalLangs.size, formalLangs.toSet().size)
+    }
+
+    @Test fun `the Goftari voice shares the formal Persian model and engine`() {
+        // Engines are keyed by lang, so a colloquial voice must reuse exactly
+        // the formal voice's model — it only changes the text front-end.
+        val goftari = VoiceRegistry.voiceForName("fa-ir-ava-goftari")!!
+        val formal = VoiceRegistry.voiceForName("fa-ir-ava-premium")!!
+        assertTrue(goftari.colloquial)
+        assertEquals(formal.lang, goftari.lang)
+        assertEquals(formal.modelAsset, goftari.modelAsset)
+        assertEquals(formal.tokensAsset, goftari.tokensAsset)
+        assertTrue(VoiceRegistry.VOICES.filter { it.colloquial }.all { it.lang == "fa" })
+    }
+
+    @Test fun `asking for Persian by language still gets the formal voice`() {
+        assertEquals(false, VoiceRegistry.voiceForLang("fa")?.colloquial)
+        assertEquals(false, VoiceRegistry.voiceForLang("fas")?.colloquial)
     }
 
     @Test fun `Persian is first — the eager-loaded primary language`() {

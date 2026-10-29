@@ -62,4 +62,13 @@ class SsmlTest {
         assertEquals(200, segments[0].breakAfterMs)
         assertTrue(segments.last().spellOut)
     }
+
+    @Test fun `say-as colloquial and formal mark their span only`() {
+        val segs = Ssml.parse(
+            "<speak>اول <say-as interpret-as=\"colloquial\">وسط</say-as> " +
+                "<say-as interpret-as=\"formal\">رسمی</say-as> آخر</speak>"
+        )
+        assertEquals(listOf(null, true, false, null), segs.map { it.colloquial })
+        assertEquals(listOf(false, false, false, false), segs.map { it.spellOut })
+    }
 }
