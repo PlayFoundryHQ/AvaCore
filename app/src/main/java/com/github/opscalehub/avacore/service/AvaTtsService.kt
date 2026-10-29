@@ -26,20 +26,18 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 /**
- * AvaTtsService: an offline-first, streaming, **multi-language** TTS engine —
- * Persian (its heart), English and Swedish today.
+ * AvaTtsService: a fully offline, streaming **Persian** TTS engine that reads
+ * in spoken Persian (Goftari) by default.
  *
  * Synthesis is streamed sentence-by-sentence via Sherpa's generateWithCallback,
  * so the first audio plays almost immediately and stop requests are honored
- * mid-utterance. Each language gets its own lazily-initialized [OfflineTts]
- * engine + [TextProcessor], so binding the service doesn't pay for models the
- * caller never asks for.
+ * mid-utterance. The engine + [TextProcessor] are built on a background thread
+ * (warmed in [onCreate]), keyed by language code.
  */
 class AvaTtsService : TextToSpeechService() {
 
-    // Engines + processors are keyed by language code and built lazily, one
-    // background thread per language, the first time that language is asked
-    // for — binding the service never pays for a model nobody requested.
+    // Engines + processors are keyed by language code and built on a
+    // background thread, so binding the service never blocks on model load.
     private val engines = ConcurrentHashMap<String, OfflineTts>()
     private val processors = ConcurrentHashMap<String, TextProcessor>()
     private val initLatches = ConcurrentHashMap<String, CountDownLatch>()
@@ -58,11 +56,15 @@ class AvaTtsService : TextToSpeechService() {
 
         // Bump whenever the bundled model/tokens/espeak/lexicon assets change so
         // stale copies in filesDir are re-extracted on the next launch.
-        // v3: multi-language — Persian, English, Swedish.
+        // v3: multi-language (since dropped — Persian only).
         // v4: expanded lexicon.txt (language-learning + more fixed-ezafe entries).
         // v5: short-vowel fixes in lexicon.txt.
         // v6: goftari.txt (spoken-Persian table).
-        private const val ASSETS_VERSION = 6
+        // v7: Persian only — removes downloaded English/Swedish voices.
+        private const val ASSETS_VERSION = 7
+
+        // Voices downloaded on demand up to 1.3.0, deleted to free their space.
+        private val DROPPED_FILES = listOf("model_en.onnx", "tokens_en.txt", "model_sv.onnx", "tokens_sv.txt")
 
         // Keep chunks small; some OEM audio paths reject large buffers.
         private const val MAX_CHUNK_BYTES = 8192
@@ -83,8 +85,7 @@ class AvaTtsService : TextToSpeechService() {
     override fun onCreate() {
         Log.d(TAG, "onCreate: Initializing AvaCore TTS")
         super.onCreate()
-        // Warm Persian eagerly — it's the primary/default language and the
-        // most likely first request; English/Swedish stay lazy.
+        // Warm the Persian engine eagerly so the first request doesn't wait.
         ensureEngineInitialized(VOICES.first())
     }
 
@@ -148,18 +149,8 @@ class AvaTtsService : TextToSpeechService() {
         val espeakDir = File(filesDir, ESPEAK_DIR)
 
         if (!modelFile.exists() || tokensFile.length() == 0L) {
-            if (voice.bundledInApk) {
-                Log.w(TAG, "No bundled model for '${voice.lang}' — run download_assets.sh; that voice stays unavailable")
-                return
-            }
-            // Not shipped in the APK (keeps the install small) — fetch it now,
-            // on this dedicated per-language background thread, so the very
-            // first non-Persian request pays a one-time download instead of
-            // every install paying for every language.
-            if (!ModelDownloader.ensureModel(voice, filesDir)) {
-                Log.w(TAG, "Could not download model for '${voice.lang}' — that voice stays unavailable this attempt")
-                return
-            }
+            Log.w(TAG, "No bundled model for '${voice.lang}' — run download_assets.sh; that voice stays unavailable")
+            return
         }
 
         val vitsConfig = OfflineTtsVitsModelConfig(
@@ -178,8 +169,8 @@ class AvaTtsService : TextToSpeechService() {
 
         val newTts = createOfflineTts(vitsConfig, cpuThreads, voice.lang)
 
-        val processor = if (voice.usePersianPipeline) {
-            // The Persian text front-end (lexicon is optional / best-effort).
+        // The Persian text front-end (lexicon and Goftari table are best-effort).
+        val processor = run {
             val lexicon = try {
                 PronunciationLexicon.fromStream(File(filesDir, LEXICON_NAME).takeIf { it.exists() }?.inputStream())
             } catch (e: Exception) {
@@ -192,12 +183,8 @@ class AvaTtsService : TextToSpeechService() {
                 Log.w(TAG, "Goftari table load failed; spoken mode will read formally", e)
                 GoftariRewriter.fromStream(null)
             }
-            TextProcessor(lexicon, applyPersianPipeline = true, goftari = goftari).also {
+            TextProcessor(lexicon, goftari = goftari).also {
                 Log.i(TAG, "AvaCore ready for 'fa'. SR=${newTts.sampleRate()} lexicon=${lexicon.size}")
-            }
-        } else {
-            TextProcessor(PronunciationLexicon.fromStream(null), applyPersianPipeline = false).also {
-                Log.i(TAG, "AvaCore ready for '${voice.lang}'. SR=${newTts.sampleRate()}")
             }
         }
 
@@ -222,6 +209,7 @@ class AvaTtsService : TextToSpeechService() {
 
         Log.i(TAG, "Extracting assets (have=$current want=$ASSETS_VERSION)")
         marker.delete() // invalidate until the full copy succeeds
+        DROPPED_FILES.forEach { File(filesDir, it).delete() }
 
         for (voice in VOICES) {
             copyAssetIfBundled(voice.modelAsset)
@@ -235,7 +223,7 @@ class AvaTtsService : TextToSpeechService() {
         marker.writeText(ASSETS_VERSION.toString())
     }
 
-    /** Some languages' model/tokens files may not be bundled yet (partial
+    /** The model/tokens files may not be bundled yet (partial
      *  `download_assets.sh` run) — skip them rather than fail the whole batch;
      *  [prepareAndInitialize] treats a missing model as "voice unavailable". */
     private fun copyAssetIfBundled(fileName: String) {
@@ -347,10 +335,10 @@ class AvaTtsService : TextToSpeechService() {
             "len=${rawText.length} text='${rawText.take(60).replace('\n', ' ')}'")
 
         try {
-            // Spoken Persian if the app picked the Goftari voice, or the user
-            // turned it on for every app in AvaCore's settings; an SSML
-            // <say-as interpret-as="colloquial|formal"> span still overrides it.
-            val colloquial = voice.colloquial || AvaSettings.goftariByDefault(this)
+            // Spoken Persian unless the user turned it off in AvaCore's
+            // settings; an SSML <say-as interpret-as="colloquial|formal"> span
+            // still overrides it.
+            val colloquial = AvaSettings.goftariByDefault(this)
             val units = processor.process(rawText, colloquial)
             if (colloquial) Log.d(TAG, "goftari: '${units.joinToString(" ") { it.text }.take(80)}'")
             if (units.isEmpty()) {

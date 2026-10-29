@@ -14,14 +14,10 @@ data class SpeakUnit(
 )
 
 /**
- * Turns raw input (plain or SSML) into an ordered list of [SpeakUnit]s ready
- * for the neural engine. SSML parsing and sentence segmentation are language-
- * generic; the digit/number expansion, script normalisation and pronunciation
- * lexicon are Persian-specific — eSpeak-NG's own English/Swedish/etc. front
- * ends already handle numbers and punctuation for those languages, so
- * [applyPersianPipeline] `= false` skips straight to segmentation for them.
+ * Turns raw Persian input (plain or SSML) into an ordered list of
+ * [SpeakUnit]s ready for the neural engine.
  *
- * Pipeline order matters (Persian only):
+ * Pipeline order matters:
  *   1. SSML parse             — split into content segments + forced pauses
  *   2. AbbreviationExpander   — whole-word abbreviations ("ه.ش", "km") before
  *                               anything else touches the surrounding text
@@ -37,14 +33,13 @@ data class SpeakUnit(
  *                              (already lexicon-fixed) word before it
  *  10. SentenceSegmenter     — break into streamable units with prosodic pauses
  *
- * [process]'s `colloquial` is the request's default (the chosen voice or the
- * global setting); an SSML `<say-as interpret-as="colloquial|formal">` span
+ * [process]'s `colloquial` is the request's default (AvaCore's Goftari
+ * setting); an SSML `<say-as interpret-as="colloquial|formal">` span
  * overrides it for that span.
  */
 class TextProcessor(
     private val lexicon: PronunciationLexicon,
     private val normalizer: Normalizer = Normalizer(),
-    private val applyPersianPipeline: Boolean = true,
     private val goftari: GoftariRewriter? = null,
 ) {
 
@@ -76,7 +71,6 @@ class TextProcessor(
     }
 
     private fun pipeline(text: String, colloquial: Boolean): String {
-        if (!applyPersianPipeline) return text.replace(Regex("\\s+"), " ").trim()
         var s = AbbreviationExpander.expand(text)
         s = DateCurrencyExpander.expand(s)      // dates/currency before generic number expansion
         s = NumberToWords.expand(s)
@@ -89,14 +83,8 @@ class TextProcessor(
         return s
     }
 
-    /** For SSML say-as characters/digits: read each character individually.
-     *  Non-Persian languages skip the Persian cardinal-word conversion and
-     *  comma separator — eSpeak reads a single digit character natively in
-     *  its own language, so a plain Latin comma between characters is enough. */
+    /** For SSML say-as characters/digits: read each character individually. */
     private fun spellOut(text: String): String {
-        if (!applyPersianPipeline) {
-            return text.trim().filterNot { it.isWhitespace() }.toList().joinToString(", ") { it.toString() }
-        }
         val sb = StringBuilder()
         for (c in NumberToWords.foldDigits(text.trim())) {
             if (c.isWhitespace()) continue

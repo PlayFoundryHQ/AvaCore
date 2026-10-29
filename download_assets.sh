@@ -3,10 +3,7 @@ set -e
 
 # ==============================================================================
 # AvaCore Professional Asset Provisioner - HIGH QUALITY EDITION (Float32)
-# Bundles Persian (the heart of it) into the APK. English and Swedish are NOT
-# bundled — AvaTtsService's ModelDownloader fetches them on-device the first
-# time they're actually requested, so the install stays small. See PLAN.md
-# Phase 2 item 5.
+# Bundles AvaCore's one voice, Persian, into the APK.
 # ==============================================================================
 
 PROJECT_ROOT="."
@@ -19,15 +16,12 @@ AAR_URL="https://huggingface.co/csukuangfj/sherpa-onnx-libs/resolve/main/android
 
 # 2. Bundled voice models (Full Quality Float32). Format per entry:
 #   "<lang code>|<bundle slug>|<onnx basename inside the bundle>"
-# Keep this in sync with VoiceRegistry.kt's bundledInApk=true entries — only
-# Persian belongs here. English/Swedish use the same slug/basename convention
-# in VoiceRegistry (bundleSlug/onnxBasename) but are fetched at runtime by
-# ModelDownloader instead of by this script.
+# Keep this in sync with VoiceRegistry.kt's VOICES.
 VOICES=(
   "fa|vits-piper-fa_IR-gyro-medium|fa_IR-gyro-medium"
 )
 
-# 3. Linguistic Phonemizer Data (eSpeak-NG) — shared across every language.
+# 3. Linguistic Phonemizer Data (eSpeak-NG).
 ESPEAK_DATA_URL="$RELEASE/espeak-ng-data.tar.bz2"
 
 echo "🚀 Starting Professional HIGH-QUALITY Asset Provisioning..."
@@ -93,5 +87,4 @@ for entry in "${VOICES[@]}"; do
         echo "Model [$LANG]: not provisioned"
     fi
 done
-echo "English/Swedish: not bundled — fetched on-device on first use (ModelDownloader)."
 echo "--------------------------------------------------------"

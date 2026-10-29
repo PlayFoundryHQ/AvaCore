@@ -1,7 +1,7 @@
 # AvaCore — Plan & Change Log
 
-> Status (2026-09-12): **multi-language engine shipped and verified** (Persian /
-> English / Swedish). Two real production bugs found live and fixed. This
+> Status (2026-10-29): **Persian-only, spoken (Goftari) Persian by default.**
+> English/Swedish and the separate formal voice were dropped in 1.4.0. This
 > document is the single place tracking what changed, why, and what's left —
 > mirrors the pattern used in the companion **AdaptiveFlow** repo.
 
@@ -12,14 +12,14 @@ Sherpa-ONNX + Piper VITS + eSpeak-NG, registering as a system
 `TextToSpeechService` so any app on the device can use it. **Persian is the
 heart of the project** — a full custom NLP front-end (ezafe restoration,
 number expansion, script normalisation, a curated pronunciation lexicon)
-exists specifically because eSpeak's own Persian support is weak. English and
-Swedish ride the same pipeline as plain, high-quality Piper voices, no custom
-front-end needed since eSpeak already handles their numbers/punctuation well.
+exists specifically because eSpeak's own Persian support is weak. Since 1.4.0
+it is the only language.
 
 Primary consumer today: **AdaptiveFlow** (`PlayFoundryHQ/adaptiveflow`), which
 prefers AvaCore for any language it reports supporting, asked live via
 `TextToSpeech.isLanguageAvailable()` — no hardcoded language list on the
-caller's side.
+caller's side, so for English/Swedish it now falls back to the system engine
+on its own.
 
 ## 1. Change log
 
@@ -102,22 +102,29 @@ item 8). Goftari mode changes the words, not the voice's delivery — the model
 was trained on formal read speech; a conversational voice would need a
 conversational corpus.
 
-## 2. Current state (2026-09-12)
+### Persian-only focus (1.4.0, October 2026)
 
-- Languages: **Persian** (custom NLP front-end), **English** (`en_US-amy-medium`),
-  **Swedish** (`sv_SE-nst-medium`). All Piper VITS "medium" quality.
-- Each language's `OfflineTts` engine binds lazily on first request (Persian
-  eager in `onCreate`).
-- `AvaTtsService` correctly implements both the locale-based and per-voice
-  framework hooks — `onIsLanguageAvailable`/`onLoadLanguage`/`onGetLanguage`
-  **and** `onIsValidVoiceName`/`onLoadVoice`.
-- Debug APK ≈ 190MB (three float32 medium models bundled in `assets/`, all
-  provisioned at build time via `download_assets.sh`; none downloaded at
-  runtime).
-- `release-please` on `main` currently **fails**: "GitHub Actions is not
-  permitted to create or approve pull requests" — a repo Settings → Actions
-  toggle, not a code issue. Needs a human with repo admin to flip it
-  (Settings → Actions → General → Workflow permissions → allow PR creation).
+The project's direction is spoken Persian, so everything else went:
+- **English/Swedish voices removed**, with `ModelDownloader`, the
+  `commons-compress` dependency and the **`INTERNET` permission** — the app
+  can no longer reach the network at all. Files a 1.3.0 install downloaded
+  (`model_en/sv.onnx`, `tokens_en/sv.txt`) are deleted on the `ASSETS_VERSION`
+  7 migration.
+- **One voice, `fa-ir-ava-goftari`.** The formal `fa-ir-ava-premium` voice is
+  gone; its name still resolves to the one voice so apps that saved it keep
+  working.
+- **Goftari is the default.** The settings switch now defaults to on and
+  turning it off gives formal (Ketabi) reading; SSML `say-as
+  colloquial|formal` still overrides it per span.
+
+## 2. Current state (2026-10-29)
+
+- One voice: Persian `fa_IR-gyro-medium` (Piper VITS "medium"), bundled in
+  the APK, engine warmed in `onCreate`.
+- `AvaTtsService` implements both the locale-based and per-voice framework
+  hooks — `onIsLanguageAvailable`/`onLoadLanguage`/`onGetLanguage` **and**
+  `onIsValidVoiceName`/`onLoadVoice`.
+- Release APK ≈ 82 MB.
 
 ## 3. Punch list — what's left
 
