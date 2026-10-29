@@ -28,25 +28,11 @@ class MainActivity : AppCompatActivity() {
     private var tts: TextToSpeech? = null
     private var ttsReady = false
 
-    // One representative sample per bundled voice — exercises number
-    // expansion / punctuation pauses for Persian, plain sentences for the
-    // languages that don't need the custom NLP pipeline.
-    private val sampleTextFor: Map<String, String> = mapOf(
-        "fa" to "سلام! این موتور بازگوکننده آوا است. " +
-            "امروز ۱۲ خرداد ۱۴۰۴ است، دمای هوا ۳۵ درجه و رطوبت ۲۰٪ می‌باشد. " +
-            "زبان مادری من فارسی است.",
-        "en" to "Hello! This is the Ava voice engine speaking English. " +
-            "Today is September the twelfth, and it's thirty five degrees outside.",
-        "sv" to "Hej! Det här är Ava-rösten som talar svenska. " +
-            "Idag är det tolfte september och det är trettiofem grader ute.",
-    )
-
-    // The Goftari voice gets formal text full of verbs on purpose: hearing it
-    // come out as spoken Persian is the point of the demo.
-    private val sampleTextForVoice: Map<String, String> = mapOf(
-        "fa-ir-ava-goftari" to "سلام! من می‌خواهم امروز به خانه بروم، چون هوا خیلی سرد است. " +
-            "شما می‌توانید با من بیایید؟ نمی‌دانم آنها کجا می‌روند.",
-    )
+    // Formal text full of verbs and numbers on purpose: hearing it come out
+    // as spoken Persian (with the Goftari switch on) is the point of the demo.
+    private val sampleText = "سلام! من می‌خواهم امروز به خانه بروم، چون هوا خیلی سرد است. " +
+        "امروز ۱۲ خرداد ۱۴۰۴ است و دمای هوا ۴ درجه است. " +
+        "شما می‌توانید با من بیایید؟ نمی‌دانم آنها کجا می‌روند."
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -80,7 +66,7 @@ class MainActivity : AppCompatActivity() {
         initializeTts()
     }
 
-    /** One button per bundled voice, in registry order (Persian first). */
+    /** One button per bundled voice (today: the one Persian voice). */
     private fun buildVoiceButtons(container: LinearLayout) {
         container.removeAllViews()
         for (voice in VoiceRegistry.VOICES) {
@@ -103,20 +89,15 @@ class MainActivity : AppCompatActivity() {
                 Log.e("MainActivity", "TTS initialization failed")
                 return@TextToSpeech
             }
-            // English/Swedish aren't bundled in the APK — the first request
-            // for either kicks off a one-time on-device download
-            // (ModelDownloader) that can easily outlast the framework's own
-            // synthesis wait, so that first tap fails with onError() rather
-            // than hanging. Surface that as a "try again" hint instead of a
-            // silent/confusing failure.
+            // The engine loads the voice in the background on first use; a tap
+            // that beats it fails with onError() — say so instead of staying silent.
             tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {}
                 override fun onDone(utteranceId: String?) {}
                 @Deprecated("Deprecated in Java")
                 override fun onError(utteranceId: String?) {
                     runOnUiThread {
-                        tvVoiceResult.text = "⏳ Not cached yet — downloading this voice in the background. " +
-                            "Wait a few seconds and tap again."
+                        tvVoiceResult.text = "⏳ The voice is still loading — wait a few seconds and tap again."
                     }
                 }
             })
@@ -136,8 +117,7 @@ class MainActivity : AppCompatActivity() {
             tvVoiceResult.text = "⏳ TTS engine not ready yet."
             return
         }
-        val voiceModel = VoiceRegistry.voiceForName(voiceName)
-        if (voiceModel == null) {
+        if (VoiceRegistry.voiceForName(voiceName) == null) {
             tvVoiceResult.text = "❌ Unknown voice: $voiceName"
             return
         }
@@ -155,8 +135,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        val sample = sampleTextForVoice[voiceName] ?: sampleTextFor[voiceModel.lang] ?: "Hello, this is $voiceName."
-        val speakResult = engine.speak(sample, TextToSpeech.QUEUE_FLUSH, null, "sample_$voiceName")
+        val speakResult = engine.speak(sampleText, TextToSpeech.QUEUE_FLUSH, null, "sample_$voiceName")
         tvVoiceResult.text = if (speakResult == TextToSpeech.SUCCESS) {
             "✅ Speaking $voiceName"
         } else {

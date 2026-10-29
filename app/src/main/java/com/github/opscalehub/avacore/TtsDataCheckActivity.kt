@@ -11,15 +11,10 @@ class TtsDataCheckActivity : Activity() {
     companion object {
         private const val TAG = "TtsDataCheckActivity"
 
-        // ISO-3 lang-country pairs for every bundled voice, in the same order
-        // as AvaTtsService.VOICES (Persian first — it's the primary language).
-        private val AVAILABLE_LOCALES = arrayListOf("fas-IRN", "eng-USA", "swe-SWE")
+        // ISO-3 lang-country pair of the one bundled voice (Persian).
+        private val AVAILABLE_LOCALES = arrayListOf("fas-IRN")
 
-        private val SAMPLE_TEXT = mapOf(
-            "fas" to "این یک آزمایش از موتور بازگوکننده آوا است.",
-            "eng" to "This is a test of the AvaCore speech engine.",
-            "swe" to "Det här är ett test av AvaCore-taltjänsten.",
-        )
+        private const val SAMPLE_TEXT = "این یک آزمایش از موتور بازگوکننده آوا است."
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,8 +27,7 @@ class TtsDataCheckActivity : Activity() {
 
         when (action) {
             TextToSpeech.Engine.ACTION_CHECK_TTS_DATA -> {
-                // Correctly-formed ISO-3 locales (lang-country), one per bundled
-                // voice: Persian, English, Swedish.
+                // Correctly-formed ISO-3 locale (lang-country) of the bundled voice.
                 resultIntent.putStringArrayListExtra(TextToSpeech.Engine.EXTRA_AVAILABLE_VOICES, AVAILABLE_LOCALES)
                 resultIntent.putStringArrayListExtra(TextToSpeech.Engine.EXTRA_UNAVAILABLE_VOICES, arrayListOf())
 
@@ -43,8 +37,7 @@ class TtsDataCheckActivity : Activity() {
                 val lang = intent.getStringExtra("language")
                 Log.d(TAG, "GET_SAMPLE_TEXT for language: $lang")
 
-                val sampleText = SAMPLE_TEXT[lang] ?: SAMPLE_TEXT.getValue("fas")
-                resultIntent.putExtra(TextToSpeech.Engine.EXTRA_SAMPLE_TEXT, sampleText)
+                resultIntent.putExtra(TextToSpeech.Engine.EXTRA_SAMPLE_TEXT, SAMPLE_TEXT)
                 // The TTS settings screen only accepts the sample when the result
                 // code is LANG_AVAILABLE; returning RESULT_OK makes it silently fall
                 // back to its built-in English string (spoken by the wrong voice as

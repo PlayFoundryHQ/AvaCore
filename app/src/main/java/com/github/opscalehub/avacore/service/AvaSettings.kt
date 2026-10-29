@@ -7,9 +7,9 @@ object AvaSettings {
     private const val PREFS = "avacore_settings"
     private const val KEY_GOFTARI = "goftari_by_default"
 
-    /** Read every app's Persian in spoken (Goftari) form, not just requests for the Goftari voice. */
+    /** Read Persian in spoken (Goftari) form — on unless the user turned it off. */
     fun goftariByDefault(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_GOFTARI, false)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_GOFTARI, true)
 
     fun setGoftariByDefault(context: Context, on: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_GOFTARI, on).apply()
