@@ -72,6 +72,36 @@ actually fired from AdaptiveFlow, regardless of whether AvaCore was installed.
 Fixed on that side (`adaptiveflow` v0.8.0); noted here because it's the other
 half of why "nothing seemed to reach AvaCore" for so long.
 
+### PRs #14–#17 — Natural Persian (October 2026)
+Pitch: read Persian the way it is spoken, offline, on an ordinary phone.
+Measured before building, which changed the scope:
+- **#14 Rhythm.** Verse hemistichs, ellipses, spaced dashes and list items get
+  their own pauses; long sentences split at a comma or before «و». The lexicon
+  became a single-pass indexed lookup. `tools/g2p-eval` added.
+- **#15 Short vowels.** The plan said "grow the lexicon to 3–5k words". The
+  harness showed eSpeak-NG's own Persian dictionary already gets ~96% of common
+  words right (tihudict, 1,781 words: 4.1% flagged, about half of those the
+  reference's own mistakes). So only the real misreadings were fixed — above
+  all the number words NumberToWords emits on every number (four was read
+  *chāhār*, nine «نه» *na*) — 41 entries. Vowel-error rate after: tihudict
+  3.9%, ipa-dict 17.7% (rare words/names), AvaCore's own gold set 0.6%.
+  eSpeak quirks found: shadda in a replacement is read "tashdid"; a vowel mark
+  before a silent final ه drops the e; sukun works. Enforced by tests.
+- **#16 Goftari mode.** `GoftariRewriter` + generated `goftari.txt` (652
+  entries); global switch, `fa-ir-ava-goftari` voice, SSML span. Verified on
+  the emulator (service log shows the rewritten text for all three paths).
+  Also fixed: the lexicon treated ، ؛ ؟ and Persian digits as letters, so an
+  entry right before them never matched (since the original lexicon).
+- **#17 Docs/positioning.** README/landing/ARCHITECTURE rewritten around
+  zero-bloat / spoken Persian / privacy, with the limits stated; landing-page
+  overclaims removed ("completely natural", "first open-source", NNAPI
+  acceleration).
+
+Still the real ceiling, unchanged: **ezafe + homographs** need context (§3
+item 8). Goftari mode changes the words, not the voice's delivery — the model
+was trained on formal read speech; a conversational voice would need a
+conversational corpus.
+
 ## 2. Current state (2026-09-12)
 
 - Languages: **Persian** (custom NLP front-end), **English** (`en_US-amy-medium`),
