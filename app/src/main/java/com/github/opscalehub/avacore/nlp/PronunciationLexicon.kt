@@ -82,6 +82,10 @@ class PronunciationLexicon private constructor(
 
     val size: Int get() = entryCount
 
+    /** Whether [key] is an exact entry (used by [GoftariRewriter] to decide a join). */
+    fun hasKey(key: String): Boolean =
+        key.isNotEmpty() && isLetter(key[0]) && byFirstWord[leadingWord(key, 0)]?.any { it.first == key } == true
+
     companion object {
         fun fromStream(input: InputStream?): PronunciationLexicon {
             if (input == null) return PronunciationLexicon(emptyMap())
@@ -106,8 +110,11 @@ class PronunciationLexicon private constructor(
             }
         }
 
-        private fun isLetter(c: Char): Boolean =
-            c in '\u0600'..'\u06FF' || c in '\uFB50'..'\uFE7E'
+        /** A Persian/Arabic letter or vowel mark — not the punctuation (، ؛ ؟)
+         *  and digits that share the same Unicode blocks, which are boundaries. */
+        internal fun isLetter(c: Char): Boolean =
+            (c in '\u0600'..'\u06FF' || c in '\uFB50'..'\uFE7E') &&
+                (Character.isLetter(c) || Character.getType(c) == Character.NON_SPACING_MARK.toInt())
 
         /** The run of letters starting at [from] (empty if [from] isn't a letter). */
         private fun leadingWord(s: String, from: Int): String {

@@ -69,4 +69,14 @@ class NumberToWordsTest {
         org.junit.Assert.assertTrue(out.contains("صد"))
         org.junit.Assert.assertTrue(out.contains("میلیون"))
     }
+
+    @Test fun nine_isWrittenUnambiguously_andItsOrdinalStaysPlain() {
+        // bare «نه» is also "no" and eSpeak reads it "na"
+        assertEquals("نُه", NumberToWords.toCardinal("9"))
+        assertEquals("بیست و نُه", NumberToWords.toCardinal("29"))
+        assertEquals("نهم", NumberToWords.toOrdinal("9"))
+        assertEquals("بیست و نهم", NumberToWords.toOrdinal("29"))
+        assertEquals("نوزده", NumberToWords.toCardinal("19"))
+        assertEquals("نهصد", NumberToWords.toCardinal("900"))
+    }
 }

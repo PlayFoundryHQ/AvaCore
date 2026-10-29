@@ -31,16 +31,24 @@ data class SpeakUnit(
  *                               thousands separators are still intact
  *   5. Normalizer.normalize  — character/ZWNJ/punctuation/whitespace cleanup
  *   6. fold leftover digits  — any stray digits eSpeak would mishandle -> ASCII
- *   7. PronunciationLexicon  — high-precision pronunciation/ezafe overrides
- *   8. SentenceSegmenter     — break into streamable units with prosodic pauses
+ *   7. GoftariRewriter       — spoken (Goftari) mode only: formal -> spoken word forms
+ *   8. PronunciationLexicon  — high-precision pronunciation/ezafe overrides
+ *   9. GoftariRewriter       — spoken mode only: glue the copula «است» onto the
+ *                              (already lexicon-fixed) word before it
+ *  10. SentenceSegmenter     — break into streamable units with prosodic pauses
+ *
+ * [process]'s `colloquial` is the request's default (the chosen voice or the
+ * global setting); an SSML `<say-as interpret-as="colloquial|formal">` span
+ * overrides it for that span.
  */
 class TextProcessor(
     private val lexicon: PronunciationLexicon,
     private val normalizer: Normalizer = Normalizer(),
     private val applyPersianPipeline: Boolean = true,
+    private val goftari: GoftariRewriter? = null,
 ) {
 
-    fun process(raw: String): List<SpeakUnit> {
+    fun process(raw: String, colloquial: Boolean = false): List<SpeakUnit> {
         if (raw.isBlank()) return emptyList()
 
         val out = ArrayList<SpeakUnit>()
@@ -48,7 +56,7 @@ class TextProcessor(
             if (seg.text.isNotBlank()) {
                 val prepared =
                     if (seg.spellOut) spellOut(seg.text)
-                    else pipeline(seg.text)
+                    else pipeline(seg.text, seg.colloquial ?: colloquial)
 
                 val units = SentenceSegmenter.split(prepared, seg.rateMultiplier, seg.pitchMultiplier)
                 out.addAll(units)
@@ -67,14 +75,17 @@ class TextProcessor(
         return out
     }
 
-    private fun pipeline(text: String): String {
+    private fun pipeline(text: String, colloquial: Boolean): String {
         if (!applyPersianPipeline) return text.replace(Regex("\\s+"), " ").trim()
         var s = AbbreviationExpander.expand(text)
         s = DateCurrencyExpander.expand(s)      // dates/currency before generic number expansion
         s = NumberToWords.expand(s)
         s = normalizer.normalize(s)
         s = NumberToWords.foldDigits(s)        // fold any digits left after expansion
+        val spoken = colloquial && goftari != null
+        if (spoken) s = goftari!!.rewriteWords(s)
         s = lexicon.apply(s)
+        if (spoken) s = goftari!!.attachCopula(s)
         return s
     }
 

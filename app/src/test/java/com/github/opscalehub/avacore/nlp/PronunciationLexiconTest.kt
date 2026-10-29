@@ -27,6 +27,9 @@ class PronunciationLexiconTest {
 
     @Test fun zwnjAndPunctuationAreBoundaries() {
         assertEquals("زَبان‌ها، زَبان.", lex.apply("زبان‌ها، زبان."))
+        // ، ؛ ؟ and Persian digits live in the Arabic Unicode block but are not
+        // letters — an entry right before them must still match.
+        assertEquals("زبانِ مادری، زَبان؟ زَبان؛ زَبان۲", lex.apply("زبان مادری، زبان؟ زبان؛ زبان۲"))
     }
 
     @Test fun symbolKeys_matchOnlyWhenNotGluedToALetter() {
