@@ -8,6 +8,9 @@ package com.github.opscalehub.avacore.nlp
  *  - normalize the ZWNJ (نیم‌فاصله) and stray control characters
  *  - strip kashida (ـ) and decorative combining marks that confuse G2P
  *  - canonicalize punctuation spacing and collapse whitespace
+ *  - mark verse-line midpoints (see [markHemistichs]) before whitespace is
+ *    collapsed, since the wide gap between hemistichs is exactly what that
+ *    collapsing would otherwise erase
  *
  * Digit handling is intentionally NOT done here — numbers are expanded to words
  * by [NumberToWords] first, and any leftover digits are folded afterwards. Keeping
@@ -19,6 +22,7 @@ class Normalizer {
 
     fun normalize(text: String): String {
         var s = text
+        s = markHemistichs(s)
         s = foldCharacters(s)
         s = normalizeZwnj(s)
         s = stripDecorations(s)
@@ -26,6 +30,16 @@ class Normalizer {
         s = collapseWhitespace(s)
         return s.trim()
     }
+
+    /**
+     * Persian verse is usually written as two hemistichs on one line, separated
+     * by a tab, a wide run of spaces (8+, so stray double spaces in prose
+     * don't count), " * " or " / ". Replace that gap with
+     * [SentenceSegmenter.HEMISTICH] so the segmenter can pause there. Only a gap
+     * with text on both sides of the same line counts — indentation doesn't.
+     */
+    private fun markHemistichs(text: String): String =
+        text.replace(HEMISTICH_GAP, " ${SentenceSegmenter.HEMISTICH} ")
 
     /** Map Arabic-shaped letters and presentation forms to canonical Persian. */
     private fun foldCharacters(text: String): String {
@@ -80,6 +94,10 @@ class Normalizer {
             // no space before, one space after Persian punctuation
             .replace(Regex("\\s*([،؛؟!:])"), "$1")
             .replace(Regex("([،؛؟!:])(?=\\S)"), "$1 ")
+    }
+
+    private companion object {
+        val HEMISTICH_GAP = Regex("(?<=\\S)[ ]*(?:\\t+| {8,}| \\* | / )[ ]*(?=\\S)")
     }
 
     private fun collapseWhitespace(text: String): String {

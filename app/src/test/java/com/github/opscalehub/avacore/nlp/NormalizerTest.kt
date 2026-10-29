@@ -29,4 +29,15 @@ class NormalizerTest {
     @Test fun preserves_zwnj() {
         assertTrue(n.normalize("می‌روم").contains('‌'))
     }
+
+    @Test fun marks_hemistichGap_butNotIndentationOrSlashInsideText() {
+        val h = SentenceSegmenter.HEMISTICH
+        assertEquals("بنی آدم اعضای یکدیگرند $h که در آفرینش ز یک گوهرند",
+            n.normalize("بنی آدم اعضای یکدیگرند\tکه در آفرینش ز یک گوهرند"))
+        assertEquals("الف $h ب", n.normalize("الف" + " ".repeat(8) + "ب"))
+        assertEquals("الف $h ب", n.normalize("الف * ب"))
+        assertEquals("الف $h ب", n.normalize("الف / ب"))
+        assertEquals("و/یا", n.normalize("و/یا"))
+        assertEquals("متن", n.normalize("\tمتن"))
+    }
 }
