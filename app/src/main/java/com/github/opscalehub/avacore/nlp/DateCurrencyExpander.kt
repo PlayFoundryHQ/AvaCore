@@ -6,6 +6,8 @@ package com.github.opscalehub.avacore.nlp
  *    "دوازدهم خرداد هزار و چهارصد و چهار" (day-ordinal + month name + year).
  *    A plain `NumberToWords.expand` would instead read the three numbers
  *    separately and mangle the slash, which sounds nothing like a date.
+ *  - A day number written before a month name: "۱۲ خرداد" -> "دوازدهم خرداد"
+ *    — the day of a date is read as an ordinal, never «دوازده خرداد».
  *  - Currency symbols attached to a number: "$50" / "50$" -> "50 دلار", left
  *    for [NumberToWords.expand] to turn into words afterward. eSpeak has no
  *    Persian reading for "$"/"€"/"£"/"﷼"/"₹" — silently dropping or
@@ -30,6 +32,12 @@ object DateCurrencyExpander {
         "([0-9۰-۹٠-٩]{3,4})[/-]([0-9۰-۹٠-٩]{1,2})[/-]([0-9۰-۹٠-٩]{1,2})"
     )
 
+    // "۱۲ خرداد" / "۱۲ خردادماه": a 1-2 digit day (not part of a longer
+    // number) + a whole month name, optionally with «ماه».
+    private val DAY_MONTH = Regex(
+        "(?<![0-9۰-۹٠-٩.,٫٬/])([0-9۰-۹٠-٩]{1,2})\\s+(${MONTHS.joinToString("|")})((?:\\u200C?ماه)?)(?![\\p{L}\\p{Mn}\\u200C])"
+    )
+
     private val CURRENCY_SYMBOLS = linkedMapOf(
         "$" to "دلار",
         "€" to "یورو",
@@ -40,6 +48,7 @@ object DateCurrencyExpander {
 
     fun expand(text: String): String {
         var s = expandDates(text)
+        s = expandDayMonth(s)
         s = expandCurrencySymbols(s)
         return s
     }
@@ -60,6 +69,12 @@ object DateCurrencyExpander {
         val monthWord = MONTHS[month - 1]
         val yearWord = NumberToWords.toCardinal(year.toString())
         "$dayWord $monthWord $yearWord"
+    }
+
+    private fun expandDayMonth(text: String): String = DAY_MONTH.replace(text) { m ->
+        val day = NumberToWords.foldDigits(m.groupValues[1]).toIntOrNull()
+        if (day == null || day !in 1..31) return@replace m.value
+        "${NumberToWords.toOrdinal(day.toString())} ${m.groupValues[2]}${m.groupValues[3]}"
     }
 
     private fun expandCurrencySymbols(text: String): String {

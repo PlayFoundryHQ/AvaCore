@@ -27,4 +27,19 @@ class DateCurrencyExpanderTest {
         val out = DateCurrencyExpander.expand("قیمت 100€ است")
         assertTrue(out.contains("100 یورو"))
     }
+
+    @Test fun `a day number before a month name is read as an ordinal`() {
+        assertEquals("امروز دوازدهم خرداد ۱۴۰۴ است", DateCurrencyExpander.expand("امروز ۱۲ خرداد ۱۴۰۴ است"))
+        assertEquals("سوم دی", DateCurrencyExpander.expand("3 دی"))
+        assertEquals("سی‌ام تیرماه", DateCurrencyExpander.expand("۳۰ تیرماه"))
+        assertEquals("بیست و یکم مهر\u200Cماه", DateCurrencyExpander.expand("۲۱ مهر\u200Cماه"))
+    }
+
+    @Test fun `day-month leaves other numbers and words alone`() {
+        // not a day: too big, part of a longer number, or a word that only starts like a month
+        assertEquals("۴۵ خرداد", DateCurrencyExpander.expand("۴۵ خرداد"))
+        assertEquals("۱۲۳ تیر", DateCurrencyExpander.expand("۱۲۳ تیر"))
+        assertEquals("۲ دیوار", DateCurrencyExpander.expand("۲ دیوار"))
+        assertEquals("۵ مهره", DateCurrencyExpander.expand("۵ مهره"))
+    }
 }
