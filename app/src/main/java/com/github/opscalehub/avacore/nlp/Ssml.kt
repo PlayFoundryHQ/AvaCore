@@ -9,6 +9,8 @@ package com.github.opscalehub.avacore.nlp
  *   - <break time="500ms"/>          inserts a pause
  *   - <break strength="strong"/>     inserts a pause by named strength
  *   - <say-as interpret-as="characters|digits"> X </say-as>  spells X out
+ *   - <say-as interpret-as="colloquial|formal"> X </say-as>  reads X in spoken
+ *     (Goftari) or formal (Ketabi) Persian, overriding the voice/setting
  *   - <prosody rate="..." pitch="...">  per-segment rate/pitch multipliers
  *   - <emphasis level="strong|moderate|reduced">  mapped onto rate/pitch —
  *     the engine has no real loudness/stress control, so "emphasis" is
@@ -33,6 +35,8 @@ object Ssml {
         val spellOut: Boolean,
         val rateMultiplier: Float = 1f,
         val pitchMultiplier: Float = 1f,
+        /** true/false = forced spoken/formal Persian for this span; null = the request's default. */
+        val colloquial: Boolean? = null,
     )
 
     private val TAG = Regex("<[^>]+>")
@@ -58,6 +62,7 @@ object Ssml {
         val segments = ArrayList<Segment>()
         val buf = StringBuilder()
         var spellOut = false
+        var colloquial: Boolean? = null
         // Stacks so nested <prosody>/<emphasis> compose (multiply) and restore
         // cleanly on the matching close tag instead of clobbering an outer one.
         val rateStack = ArrayDeque<Float>().apply { addLast(1f) }
@@ -68,7 +73,7 @@ object Ssml {
             val t = buf.toString()
             buf.setLength(0)
             if (t.isNotBlank() || breakAfterMs > 0) {
-                segments.add(Segment(t.trim(), breakAfterMs, spellOut, rateStack.last(), pitchStack.last()))
+                segments.add(Segment(t.trim(), breakAfterMs, spellOut, rateStack.last(), pitchStack.last(), colloquial))
             }
         }
 
@@ -84,10 +89,13 @@ object Ssml {
                 "break" -> flushText(breakMs(tag))
                 "say-as" -> {
                     flushText(0)
-                    spellOut = if (!isClose) {
-                        val mode = INTERPRET_AS.find(tag)?.groupValues?.get(1)?.lowercase()
-                        mode == "characters" || mode == "digits"
-                    } else false
+                    val mode = if (isClose) null else INTERPRET_AS.find(tag)?.groupValues?.get(1)?.lowercase()
+                    spellOut = mode == "characters" || mode == "digits"
+                    colloquial = when (mode) {
+                        "colloquial" -> true
+                        "formal" -> false
+                        else -> null
+                    }
                 }
                 "prosody" -> {
                     flushText(0)

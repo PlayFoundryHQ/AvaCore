@@ -24,6 +24,8 @@ data class VoiceModel(
     val bundleSlug: String,
     val onnxBasename: String,
     val bundledInApk: Boolean,
+    /** Spoken (Goftari) Persian by default — same model, different text front-end. */
+    val colloquial: Boolean = false,
 )
 
 /**
@@ -42,6 +44,16 @@ object VoiceRegistry {
             lang = "fa", locale = Locale("fa", "IR"), voiceName = "fa-ir-ava-premium",
             modelAsset = "model_fa.onnx", tokensAsset = "tokens_fa.txt", usePersianPipeline = true,
             bundleSlug = "vits-piper-fa_IR-gyro-medium", onnxBasename = "fa_IR-gyro-medium", bundledInApk = true,
+        ),
+        // Same Persian model and engine (engines are keyed by `lang`), read in
+        // spoken Persian: apps that want «میخوام برم» instead of «می‌خواهم بروم»
+        // pick this voice with setVoice(). Listed after the formal voice so
+        // voiceForLang("fa") keeps returning the formal one.
+        VoiceModel(
+            lang = "fa", locale = Locale("fa", "IR"), voiceName = "fa-ir-ava-goftari",
+            modelAsset = "model_fa.onnx", tokensAsset = "tokens_fa.txt", usePersianPipeline = true,
+            bundleSlug = "vits-piper-fa_IR-gyro-medium", onnxBasename = "fa_IR-gyro-medium", bundledInApk = true,
+            colloquial = true,
         ),
         VoiceModel(
             lang = "en", locale = Locale.US, voiceName = "en-us-ava-premium",
