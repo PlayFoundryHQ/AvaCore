@@ -43,4 +43,37 @@ class TextProcessorTest {
         // from there.
         assertEquals("3, 5", text)
     }
+
+    private val goftari = GoftariRewriter.fromStream(java.io.File("src/main/assets/tts/goftari.txt").inputStream())
+
+    @Test fun `colloquial flag rewrites to spoken Persian, default stays formal`() {
+        val p = TextProcessor(PronunciationLexicon.fromStream(null), applyPersianPipeline = true, goftari = goftari)
+        val text = "من می‌خواهم به خانه بروم."
+        assertEquals("من می‌خواهم به خانه بروم.", p.process(text).single().text)
+        assertEquals("من میخوام به خونه برم.", p.process(text, colloquial = true).single().text)
+    }
+
+    @Test fun `ssml span overrides the request default both ways`() {
+        val p = TextProcessor(PronunciationLexicon.fromStream(null), applyPersianPipeline = true, goftari = goftari)
+        val on = p.process("<speak><say-as interpret-as=\"colloquial\">خوب است</say-as></speak>")
+        assertEquals("خوبه", on.single().text)
+        val off = p.process("<speak><say-as interpret-as=\"formal\">خوب است</say-as></speak>", colloquial = true)
+        assertEquals("خوب است", off.single().text)
+    }
+
+    @Test fun `numbers are expanded before the spoken rewrite`() {
+        val p = TextProcessor(PronunciationLexicon.fromStream(null), applyPersianPipeline = true, goftari = goftari)
+        assertEquals("قیمت سه هزار تومانه.", p.process("قیمت ۳۰۰۰ تومان است.", colloquial = true).single().text)
+    }
+
+    @Test fun `copula keeps the lexicon fix of the word it attaches to`() {
+        val lexicon = PronunciationLexicon.fromMap(mapOf("چهار" to "چَهار"))
+        val p = TextProcessor(lexicon, applyPersianPipeline = true, goftari = goftari)
+        assertEquals("ساعت چَهاره.", p.process("ساعت ۴ است.", colloquial = true).single().text)
+    }
+
+    @Test fun `non-Persian voices ignore the colloquial flag`() {
+        val p = TextProcessor(PronunciationLexicon.fromStream(null), applyPersianPipeline = false, goftari = goftari)
+        assertEquals("I want to go home.", p.process("I want to go home.", colloquial = true).single().text)
+    }
 }

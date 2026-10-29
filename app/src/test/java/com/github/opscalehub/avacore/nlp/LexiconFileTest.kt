@@ -39,4 +39,38 @@ class LexiconFileTest {
         assertTrue(lexicon.apply("حقوق بشر").contains("حقوقِ بشر"))
         assertTrue(lexicon.apply("کتاب درسی").contains("کتابِ درسی"))
     }
+
+    private fun entries(): List<Pair<String, String>> =
+        lexiconFile.readLines().map { it.trim() }
+            .filter { it.isNotEmpty() && !it.startsWith("#") && '=' in it }
+            .map { it.substringBefore('=').trim() to it.substringAfter('=').trim() }
+
+    @Test fun `replacements avoid spellings eSpeak misreads`() {
+        for ((key, value) in entries()) {
+            // shadda makes eSpeak read the word "tashdid" aloud
+            assertFalse("shadda in replacement for $key: $value", 'ّ' in value)
+            // a short-vowel mark right before a silent final ه makes eSpeak drop
+            // the final e. «ـدَه» ("-teen", a pronounced h) is the one ending
+            // where the mark is wanted.
+            assertFalse("vowel mark before final ه for $key: $value",
+                Regex("[َُِ]ه$").containsMatchIn(value) && !value.endsWith("دَه"))
+        }
+    }
+
+    @Test fun `no context-dependent homograph is a lexicon key`() {
+        // Each of these has two common readings; a lexicon entry would be wrong
+        // half the time. They need the future context-aware disambiguator.
+        val homographs = setOf("مرد", "کرم", "شکر", "نه", "کرد", "برده", "قطر", "نفس", "حسن",
+            "اعمال", "گل", "سر", "کشتی", "مهر", "ملک", "شیر", "درد", "رو")
+        val keys = entries().map { it.first }.toSet()
+        assertTrue("homograph(s) in lexicon: ${keys intersect homographs}", (keys intersect homographs).isEmpty())
+    }
+
+    @Test fun `number words from NumberToWords get their fixes`() {
+        val lexicon = PronunciationLexicon.fromStream(lexiconFile.inputStream())
+        assertTrue(lexicon.apply("صد و چهار").endsWith("چَهار"))
+        assertTrue(lexicon.apply("چهارم").startsWith("چَهارُم"))
+        assertTrue(lexicon.apply("هزار و چهارصد و چهارده").contains("چَهارصد"))
+        assertTrue(lexicon.apply("هزار و چهارصد و چهارده").endsWith("چَهارْدَه"))
+    }
 }

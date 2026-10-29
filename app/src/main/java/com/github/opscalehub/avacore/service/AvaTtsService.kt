@@ -9,6 +9,7 @@ import android.speech.tts.Voice
 import android.util.Log
 import com.github.opscalehub.avacore.dsp.PitchShifter
 import com.github.opscalehub.avacore.nlp.PronunciationLexicon
+import com.github.opscalehub.avacore.nlp.GoftariRewriter
 import com.github.opscalehub.avacore.nlp.TextProcessor
 import kotlin.math.abs
 import com.k2fsa.sherpa.onnx.OfflineTts
@@ -51,6 +52,7 @@ class AvaTtsService : TextToSpeechService() {
         private const val TAG = "AvaTtsService"
         private const val ASSET_SUBDIR = "tts"
         private const val LEXICON_NAME = "lexicon.txt"
+        private const val GOFTARI_NAME = "goftari.txt"
         private const val ESPEAK_DIR = "espeak-ng-data"
         private const val VERSION_MARKER = ".assets_version"
 
@@ -58,7 +60,9 @@ class AvaTtsService : TextToSpeechService() {
         // stale copies in filesDir are re-extracted on the next launch.
         // v3: multi-language — Persian, English, Swedish.
         // v4: expanded lexicon.txt (language-learning + more fixed-ezafe entries).
-        private const val ASSETS_VERSION = 4
+        // v5: short-vowel fixes in lexicon.txt.
+        // v6: goftari.txt (spoken-Persian table).
+        private const val ASSETS_VERSION = 6
 
         // Keep chunks small; some OEM audio paths reject large buffers.
         private const val MAX_CHUNK_BYTES = 8192
@@ -182,7 +186,13 @@ class AvaTtsService : TextToSpeechService() {
                 Log.w(TAG, "Lexicon load failed; continuing without it", e)
                 PronunciationLexicon.fromStream(null)
             }
-            TextProcessor(lexicon, applyPersianPipeline = true).also {
+            val goftari = try {
+                GoftariRewriter.fromStream(File(filesDir, GOFTARI_NAME).takeIf { it.exists() }?.inputStream())
+            } catch (e: Exception) {
+                Log.w(TAG, "Goftari table load failed; spoken mode will read formally", e)
+                GoftariRewriter.fromStream(null)
+            }
+            TextProcessor(lexicon, applyPersianPipeline = true, goftari = goftari).also {
                 Log.i(TAG, "AvaCore ready for 'fa'. SR=${newTts.sampleRate()} lexicon=${lexicon.size}")
             }
         } else {
@@ -218,6 +228,7 @@ class AvaTtsService : TextToSpeechService() {
             copyAssetIfBundled(voice.tokensAsset)
         }
         copyAssetIfBundled(LEXICON_NAME)
+        copyAssetIfBundled(GOFTARI_NAME)
         File(filesDir, ESPEAK_DIR).deleteRecursively()
         copyAssetDir("$ASSET_SUBDIR/$ESPEAK_DIR", File(filesDir, ESPEAK_DIR))
 
@@ -336,7 +347,12 @@ class AvaTtsService : TextToSpeechService() {
             "len=${rawText.length} text='${rawText.take(60).replace('\n', ' ')}'")
 
         try {
-            val units = processor.process(rawText)
+            // Spoken Persian if the app picked the Goftari voice, or the user
+            // turned it on for every app in AvaCore's settings; an SSML
+            // <say-as interpret-as="colloquial|formal"> span still overrides it.
+            val colloquial = voice.colloquial || AvaSettings.goftariByDefault(this)
+            val units = processor.process(rawText, colloquial)
+            if (colloquial) Log.d(TAG, "goftari: '${units.joinToString(" ") { it.text }.take(80)}'")
             if (units.isEmpty()) {
                 callback.done()
                 return

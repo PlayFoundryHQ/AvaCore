@@ -1,0 +1,3 @@
+# Dev-only. piper-tts bundles the same espeak-ng bridge Piper voices are
+# phonemized with; we point it at AvaCore's own espeak-ng-data.
+piper-tts==1.8.0

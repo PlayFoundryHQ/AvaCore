@@ -17,6 +17,8 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.SwitchCompat
+import com.github.opscalehub.avacore.service.AvaSettings
 import com.github.opscalehub.avacore.service.VoiceRegistry
 
 class MainActivity : AppCompatActivity() {
@@ -37,6 +39,13 @@ class MainActivity : AppCompatActivity() {
             "Today is September the twelfth, and it's thirty five degrees outside.",
         "sv" to "Hej! Det här är Ava-rösten som talar svenska. " +
             "Idag är det tolfte september och det är trettiofem grader ute.",
+    )
+
+    // The Goftari voice gets formal text full of verbs on purpose: hearing it
+    // come out as spoken Persian is the point of the demo.
+    private val sampleTextForVoice: Map<String, String> = mapOf(
+        "fa-ir-ava-goftari" to "سلام! من می‌خواهم امروز به خانه بروم، چون هوا خیلی سرد است. " +
+            "شما می‌توانید با من بیایید؟ نمی‌دانم آنها کجا می‌روند.",
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,6 +71,10 @@ class MainActivity : AppCompatActivity() {
             intent.data = Uri.parse("package:$packageName")
             startActivity(intent)
         }
+
+        val switchGoftari = findViewById<SwitchCompat>(R.id.switchGoftari)
+        switchGoftari.isChecked = AvaSettings.goftariByDefault(this)
+        switchGoftari.setOnCheckedChangeListener { _, on -> AvaSettings.setGoftariByDefault(this, on) }
 
         buildVoiceButtons(voiceButtonsContainer)
         initializeTts()
@@ -142,7 +155,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        val sample = sampleTextFor[voiceModel.lang] ?: "Hello, this is $voiceName."
+        val sample = sampleTextForVoice[voiceName] ?: sampleTextFor[voiceModel.lang] ?: "Hello, this is $voiceName."
         val speakResult = engine.speak(sample, TextToSpeech.QUEUE_FLUSH, null, "sample_$voiceName")
         tvVoiceResult.text = if (speakResult == TextToSpeech.SUCCESS) {
             "✅ Speaking $voiceName"

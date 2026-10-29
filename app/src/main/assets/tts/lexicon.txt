@@ -63,3 +63,53 @@
 # --- Common symbols read as words ---
 & = و
 @ = اَت
+
+# --- Short-vowel fixes measured with tools/g2p-eval ---------------------------
+# Each entry is a word eSpeak-NG reads with the wrong vowels on its own, checked
+# against tools/g2p-eval/gold.tsv. Spelling rules learned the hard way:
+#   * never use shadda (ّ) in a replacement — eSpeak then reads it out as "tashdid";
+#   * don't put a vowel mark right before a final ه — eSpeak then drops the final e;
+#   * sukun (ْ) is honoured and is the way to stop eSpeak inserting a vowel.
+# Number words (NumberToWords output, so these fire on every 4/14/400/4th…)
+چهار = چَهار
+چهارم = چَهارُم
+چهارمین = چَهارُمین
+چهارده = چَهارْدَه
+چهاردهم = چَهارْدَهُم
+چهاردهمین = چَهارْدَهُمین
+چهارصد = چَهارصد
+چهارشنبه = چَهارْشَنبه
+# Everyday words
+آشنا = آشِنا
+آشنایی = آشِنایی
+رسانه = رِسانه
+سازمان = سازْمان
+آزمون = آزْمون
+نخستین = نُخُستین
+گفتگو = گُفتُگو
+گفت‌وگو = گُفتُگو
+جانور = جانْوَر
+کاروان = کارْوان
+حرکت = حَرَکَت
+مهربان = مِهرَبان
+مهربانی = مِهرَبانی
+مترادف = مُتَرادِف
+رمضان = رَمَضان
+خلافت = خِلافَت
+جهاد = جِهاد
+عراق = عِراق
+عراقی = عِراقی
+عبری = عِبری
+رعایت = رِعایَت
+مجتمع = مُجتَمَع
+جریان = جَرَیان
+روبه‌رو = روبِرو
+روبرو = روبِرو
+زنجبیل = زَنجِبیل
+ناامید = ناُمید
+کیلومتر = کیلُمِتر
+متأسف = متاسف
+متأسفم = متاسفم
+متأسفانه = متاسفانه
+مسأله = مسئله
+مساله = مسئله
