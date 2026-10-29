@@ -43,6 +43,14 @@ android {
     }
 
     buildTypes {
+        // Debug builds get their own package name, so they install next to the
+        // release (Cafe Bazaar / GitHub) app instead of over it. Two signing keys
+        // can never share one package name — that collision is what kept
+        // blocking release installs on the test phone.
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -50,10 +58,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = if (signingKeyPath != null) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
+            // Release key only. Without it the APK stays unsigned rather than
+            // falling back to the debug key: a debug-signed "release" installed on
+            // a phone blocks every real release update of the same package.
+            if (signingKeyPath != null) {
+                signingConfig = signingConfigs.getByName("release")
             }
         }
     }
