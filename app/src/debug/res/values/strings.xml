@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds are a separate app (see applicationIdSuffix); label them so. -->
+<resources>
+    <string name="app_name">AvaCore (debug)</string>
+    <string name="tts_engine_name">AvaCore Persian TTS (debug)</string>
+</resources>
